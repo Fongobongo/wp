@@ -1,0 +1,20 @@
+{
+  "name": "@warprotocol/battle-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@warprotocol/shared-types": "0.1.0"
+  },
+  "devDependencies": {
+    "@warprotocol/game-data": "0.1.0"
+  }
+}

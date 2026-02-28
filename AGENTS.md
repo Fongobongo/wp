@@ -1,0 +1,61 @@
+# AGENTS.md
+
+## Purpose
+This file defines mandatory context for any coding/design agents working in the `war-protocol` repository.
+
+Primary product objective:
+- build a web-first tactical PvP game inspired by War Chest;
+- preserve fair, skill-based gameplay;
+- scale content to 25 factions and 750 units;
+- add Web3 economy as an optional layer, not as gameplay replacement.
+
+## Source of Truth
+Before changing code or content, always align with:
+1. `docs/game-design/MASTER_GDD.md` - canonical design baseline.
+2. `docs/game-design/FACTIONS_INDEX.md` - faction and content structure rules.
+3. `docs/game-design/PROGRESSION_AND_ECONOMY.md` - progression, tokenomics, F2P constraints.
+4. `docs/game-design/IMPLEMENTATION_GAP.md` - delta between target design and current implementation.
+5. `README.md` - runtime architecture and operational setup.
+
+## Non-Negotiable Product Rules
+1. Gameplay first: blockchain must not reduce gameplay quality.
+2. No pay-to-win: paid content must not grant combat power.
+3. Ranked PvP must always run on authoritative server simulation.
+4. Clients must never determine match outcome.
+5. New factions and units must follow the shared role-balance matrix.
+
+## Current Architecture (Must Respect)
+- `apps/web-client`: React + Phaser client.
+- `services/game-data-service`: game data and balance version delivery.
+- `services/player-service`: auth/profile/inventory/loadout validation.
+- `services/matchmaking-service`: queue and match pairing.
+- `services/battle-service`: prep, lock-in, server simulation, websocket stream.
+- `services/economy-service`: battle pass and rewards.
+- `packages/game-data`: data-driven catalog and validation.
+- `packages/battle-engine`: deterministic simulation and replay.
+- `packages/shared-types`: domain and API/event contracts.
+
+## Change Rules
+1. Any new mechanic must be documented in `docs/game-design/*` before implementation.
+2. Any combat-logic change must:
+- preserve determinism;
+- include reproducibility/idempotency tests;
+- preserve explicit balance versioning (`balanceVersion`).
+3. Any economy change must:
+- include anti-abuse controls;
+- preserve F2P progression viability;
+- record monetization risk in docs.
+4. New factions/units must be added data-driven, not hardcoded in UI logic.
+
+## Definition of Done for Gameplay Work
+1. Updated relevant documents in `docs/game-design/*`.
+2. Updated `shared-types` when contracts change.
+3. Added/updated tests in `packages/game-data` and/or `packages/battle-engine`.
+4. `npm run lint`, `npm run test`, `npm run build` pass.
+5. Reconnect/resend paths validated for network-facing changes.
+
+## Delivery Priorities
+1. Complete War Chest-like core loop (bag draw, tokens, control points).
+2. Raise live PvP reliability to production grade.
+3. Expand content pipeline to full 25x30 faction/unit model.
+4. Introduce Web3 gradually: ownership/marketplace first, token layer later.

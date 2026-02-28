@@ -1,0 +1,30 @@
+{
+  "name": "war-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run -ws build",
+    "test": "npm run -ws test",
+    "lint": "npm run -ws lint",
+    "dev:web": "npm --workspace @warprotocol/web-client run dev",
+    "dev:game-data": "npm --workspace @warprotocol/game-data-service run dev",
+    "dev:player": "npm --workspace @warprotocol/player-service run dev",
+    "dev:matchmaking": "npm --workspace @warprotocol/matchmaking-service run dev",
+    "dev:battle": "npm --workspace @warprotocol/battle-service run dev",
+    "dev:economy": "npm --workspace @warprotocol/economy-service run dev",
+    "dev:all": "concurrently -n game-data,player,matchmaking,battle,economy,web -c blue,green,yellow,magenta,cyan,white \"npm run dev:game-data\" \"npm run dev:player\" \"npm run dev:matchmaking\" \"npm run dev:battle\" \"npm run dev:economy\" \"npm run dev:web\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

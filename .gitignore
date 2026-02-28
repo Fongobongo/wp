@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log*
+.env
+.env.local
+dist
+coverage
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+*.tsbuildinfo
+apps/web-client/.vite

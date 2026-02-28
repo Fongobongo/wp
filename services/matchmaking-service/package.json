@@ -1,0 +1,20 @@
+{
+  "name": "@warprotocol/matchmaking-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@warprotocol/game-data": "0.1.0",
+    "@warprotocol/service-runtime": "0.1.0",
+    "@warprotocol/shared-types": "0.1.0",
+    "bullmq": "^5.58.6",
+    "ioredis": "^5.8.0",
+    "zod": "^4.1.8"
+  }
+}

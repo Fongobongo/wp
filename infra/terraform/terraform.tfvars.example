@@ -1,0 +1,8 @@
+project_name               = "war-protocol"
+environment                = "dev"
+aws_region                 = "us-east-1"
+private_subnet_ids         = ["subnet-aaaa", "subnet-bbbb"]
+redis_security_group_id    = "sg-redis"
+postgres_security_group_id = "sg-postgres"
+postgres_username          = "war_admin"
+postgres_password          = "change_me"

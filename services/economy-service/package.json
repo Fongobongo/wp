@@ -1,0 +1,17 @@
+{
+  "name": "@warprotocol/economy-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@warprotocol/service-runtime": "0.1.0",
+    "@warprotocol/shared-types": "0.1.0",
+    "zod": "^4.1.8"
+  }
+}

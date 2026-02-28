@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: war
+      POSTGRES_PASSWORD: war
+      POSTGRES_DB: war_protocol
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniopassword
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  game-data-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/game-data-service", "run", "dev"]
+    environment:
+      GAME_DATA_PORT: 4001
+    ports:
+      - "4001:4001"
+    depends_on:
+      - postgres
+      - redis
+
+  player-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/player-service", "run", "dev"]
+    environment:
+      PLAYER_PORT: 4002
+    ports:
+      - "4002:4002"
+    depends_on:
+      - game-data-service
+
+  battle-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/battle-service", "run", "dev"]
+    environment:
+      BATTLE_PORT: 4004
+    ports:
+      - "4004:4004"
+    depends_on:
+      - game-data-service
+
+  matchmaking-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/matchmaking-service", "run", "dev"]
+    environment:
+      MATCHMAKING_PORT: 4003
+      REDIS_URL: redis://redis:6379
+      BATTLE_SERVICE_URL: http://battle-service:4004
+      BATTLE_WS_URL: ws://localhost:4004
+    ports:
+      - "4003:4003"
+    depends_on:
+      - redis
+      - battle-service
+
+  economy-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/economy-service", "run", "dev"]
+    environment:
+      ECONOMY_PORT: 4005
+    ports:
+      - "4005:4005"
+
+  web-client:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/web-client", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+    environment:
+      VITE_GAME_DATA_URL: http://localhost:4001
+      VITE_PLAYER_URL: http://localhost:4002
+      VITE_MATCHMAKING_URL: http://localhost:4003
+      VITE_BATTLE_URL: http://localhost:4004
+      VITE_ECONOMY_URL: http://localhost:4005
+    ports:
+      - "5173:5173"
+    depends_on:
+      - game-data-service
+      - player-service
+      - matchmaking-service
+      - battle-service
+      - economy-service
+
+volumes:
+  postgres_data:
+  minio_data:
