@@ -66,6 +66,51 @@ Bring up infra + services + web:
 docker compose up --build
 ```
 
+## Production Domain Deployment (HTTPS)
+
+This repository includes a production stack for a permanent public domain:
+- `docker-compose.prod.yml`
+- `Dockerfile.web.prod`
+- `infra/prod/Caddyfile`
+- `infra/prod/deploy_prod.sh`
+
+### 1. Prerequisites on your VPS
+
+1. Ubuntu/Debian server with public static IP.
+2. Docker + Docker Compose plugin installed.
+3. Ports `80/tcp` and `443/tcp` open in firewall/security group.
+4. DNS `A` record pointing your domain to the VPS IP.
+
+Example:
+- `play.example.com -> <your_vps_ip>`
+
+### 2. Set production env
+
+```bash
+cp infra/prod/.env.prod.example infra/prod/.env.prod
+```
+
+Edit `infra/prod/.env.prod`:
+
+```env
+DOMAIN=play.example.com
+```
+
+### 3. Deploy
+
+```bash
+bash infra/prod/deploy_prod.sh
+```
+
+After DNS propagation, Caddy automatically provisions and renews TLS certificates.
+
+### 4. Update deployment
+
+```bash
+git pull
+bash infra/prod/deploy_prod.sh
+```
+
 ## Infrastructure
 
 Terraform skeleton is in `infra/terraform`.

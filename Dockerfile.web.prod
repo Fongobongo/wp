@@ -1,0 +1,13 @@
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY . .
+
+RUN npm ci
+RUN npm --workspace @warprotocol/web-client run build
+
+EXPOSE 4173
+
+CMD ["npm", "--workspace", "@warprotocol/web-client", "run", "preview", "--", "--host", "0.0.0.0", "--port", "4173"]
+

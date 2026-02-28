@@ -1,0 +1,27 @@
+services:
+  web-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.web.prod
+    restart: unless-stopped
+    expose:
+      - "4173"
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - web-client
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/prod/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN}
+
+volumes:
+  caddy_data:
+  caddy_config:
