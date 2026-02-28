@@ -17,6 +17,13 @@ Before changing code or content, always align with:
 4. `docs/game-design/IMPLEMENTATION_GAP.md` - delta between target design and current implementation.
 5. `README.md` - runtime architecture and operational setup.
 
+## Repository Communication and Git Rules
+1. All repository files and project content must be written in English.
+2. Russian is allowed only for direct chat communication with the user, not for files in this repository.
+3. After every change, create a separate commit and push immediately.
+4. Use GitHub SSH alias `openclaw` for repository operations.
+5. Default remote must be `openclaw:Fongobongo/wp.git` unless explicitly changed by the user.
+
 ## Non-Negotiable Product Rules
 1. Gameplay first: blockchain must not reduce gameplay quality.
 2. No pay-to-win: paid content must not grant combat power.
