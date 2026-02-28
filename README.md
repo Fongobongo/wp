@@ -106,15 +106,36 @@ Generate bcrypt hash:
 docker run --rm caddy:2.8-alpine caddy hash-password --plaintext 'strong-password'
 ```
 
+When placing bcrypt hash into `.env.prod`, escape `$` as `$$`.
+Example:
+
+```env
+BASIC_AUTH_PASSWORD_HASH=$$2a$$14$$...
+```
+
 ### 3. Deploy
 
 ```bash
 bash infra/prod/deploy_prod.sh
 ```
 
-After DNS propagation, Caddy automatically provisions and renews TLS certificates.
+This starts Caddy as an internal upstream on `127.0.0.1:8080`.
 
-### 4. Health and readiness endpoints
+### 4. Configure Nginx as public frontend for one hostname
+
+Run once on VPS:
+
+```bash
+bash infra/prod/configure_nginx_proxy.sh
+```
+
+What it does:
+- installs/enables nginx if missing;
+- creates a dedicated vhost for `DOMAIN` only;
+- proxies `DOMAIN` traffic to `127.0.0.1:8080` (docker stack);
+- if `LE_EMAIL` is set, runs certbot and enables HTTPS redirect.
+
+### 5. Health and readiness endpoints
 
 - Public health: `https://<domain>/healthz`
 - Public readiness (checks web client upstream): `https://<domain>/readyz`
@@ -126,7 +147,7 @@ After DNS propagation, Caddy automatically provisions and renews TLS certificate
   - `https://<domain>/services/battle/health`
   - `https://<domain>/services/economy/health`
 
-### 5. Auto-deploy on push to main
+### 6. Auto-deploy on push to main
 
 Configure GitHub repository secrets listed in:
 - `infra/prod/SECRETS.md`
@@ -134,7 +155,7 @@ Configure GitHub repository secrets listed in:
 Then every push to `main` triggers:
 - `.github/workflows/deploy-prod.yml`
 
-### 6. Automated uptime checks
+### 7. Automated uptime checks
 
 Scheduled checks run every 10 minutes via:
 - `.github/workflows/uptime-check.yml`
@@ -144,7 +165,7 @@ It validates:
 - readiness endpoint;
 - one protected service endpoint via HTTP basic auth.
 
-### 7. Update deployment manually
+### 8. Update deployment manually
 
 ```bash
 git pull

@@ -22,7 +22,7 @@ Configure these repository secrets before enabling production automation workflo
 ```env
 DOMAIN=play.example.com
 BASIC_AUTH_USER=ops
-BASIC_AUTH_PASSWORD_HASH=<bcrypt-hash>
+BASIC_AUTH_PASSWORD_HASH=<bcrypt-hash-with-$-escaped-as-$$>
 ```
 
 Generate bcrypt hash:
