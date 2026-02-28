@@ -1,151 +1,158 @@
 import Phaser from "phaser";
-import type { BattleEvent, BattleSnapshot, BattleUnitSnapshot } from "@warprotocol/shared-types";
+import { DEMO_UNITS } from "./demoData.js";
 
-type UnitSprite = {
-  body: Phaser.GameObjects.Rectangle;
-  hpText: Phaser.GameObjects.Text;
-  nameText: Phaser.GameObjects.Text;
+const HEX_SIZE = 34;
+const COLS = 8;
+const ROWS = 7;
+const ORIGIN_X = 150;
+const ORIGIN_Y = 110;
+
+type TileType = "plain" | "cover" | "elevation" | "energy" | "trap";
+
+const TILE_COLORS: Record<TileType, number> = {
+  plain: 0x31445a,
+  cover: 0x2d5f4a,
+  elevation: 0x5a4f38,
+  energy: 0x305f7f,
+  trap: 0x6b3544
 };
 
-const CELL = 56;
+const TILE_LABELS: Array<{ type: TileType; label: string }> = [
+  { type: "plain", label: "Plain" },
+  { type: "cover", label: "Cover" },
+  { type: "elevation", label: "Elevation" },
+  { type: "energy", label: "Energy" },
+  { type: "trap", label: "Trap" }
+];
+
+function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
+  const points: Phaser.Types.Math.Vector2Like[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const angle = Phaser.Math.DegToRad(60 * i - 30);
+    points.push({
+      x: size * Math.cos(angle),
+      y: size * Math.sin(angle)
+    });
+  }
+  return points;
+}
+
+function axialToWorld(q: number, r: number): { x: number; y: number } {
+  const x = ORIGIN_X + HEX_SIZE * Math.sqrt(3) * (q + r / 2);
+  const y = ORIGIN_Y + HEX_SIZE * 1.5 * r;
+  return { x, y };
+}
+
+function pickTileType(q: number, r: number): TileType {
+  const roll = (q * 11 + r * 7 + q * r * 3) % 9;
+  if (roll === 0) {
+    return "trap";
+  }
+  if (roll <= 2) {
+    return "energy";
+  }
+  if (roll <= 4) {
+    return "cover";
+  }
+  if (roll <= 6) {
+    return "elevation";
+  }
+  return "plain";
+}
 
 export class WarProtocolScene extends Phaser.Scene {
-  private units = new Map<string, UnitSprite>();
-
   constructor() {
     super("war-protocol-scene");
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor("#0f1318");
-    this.drawGrid(8, 8);
+    this.cameras.main.setBackgroundColor("#0d1219");
+    this.drawHexBoard();
+    this.drawUnits();
+    this.drawLegend();
   }
 
-  private drawGrid(width: number, height: number): void {
-    const line = this.add.graphics();
-    line.lineStyle(1, 0x32404f, 0.9);
-    for (let x = 0; x <= width; x += 1) {
-      line.moveTo(x * CELL, 0);
-      line.lineTo(x * CELL, height * CELL);
-    }
-    for (let y = 0; y <= height; y += 1) {
-      line.moveTo(0, y * CELL);
-      line.lineTo(width * CELL, y * CELL);
-    }
-    line.strokePath();
-  }
+  private drawHexBoard(): void {
+    const points = hexPoints(HEX_SIZE);
 
-  setInitialSnapshot(snapshot: BattleSnapshot): void {
-    this.clearUnits();
-    for (const unit of snapshot.units) {
-      this.createOrUpdateUnit(unit);
-    }
-  }
+    for (let r = 0; r < ROWS; r += 1) {
+      for (let q = 0; q < COLS; q += 1) {
+        const { x, y } = axialToWorld(q, r);
+        const tileType = pickTileType(q, r);
+        const fillColor = TILE_COLORS[tileType];
 
-  applyEvent(event: BattleEvent): void {
-    if (event.type === "move") {
-      const actorId = String(event.payload.actorId ?? "");
-      const sprite = this.units.get(actorId);
-      if (!sprite) {
-        return;
-      }
-      const x = Number(event.payload.x ?? 0);
-      const y = Number(event.payload.y ?? 0);
-      sprite.hpText.setPosition(this.worldX(x), this.worldY(y) - 10);
-      sprite.nameText.setPosition(this.worldX(x), this.worldY(y) + 10);
-      this.tweens.add({
-        targets: sprite.body,
-        x: this.worldX(x),
-        y: this.worldY(y),
-        duration: 120,
-        ease: "Sine.Out"
-      });
-      return;
-    }
+        const tile = this.add.polygon(x, y, points, fillColor, 0.85);
+        tile.setStrokeStyle(2, 0x1b2a38, 0.85);
 
-    if (event.type === "attack") {
-      const targetId = String(event.payload.targetUnitId ?? "");
-      const hpLeft = Number(event.payload.hpLeft ?? 0);
-      const sprite = this.units.get(targetId);
-      if (!sprite) {
-        return;
-      }
-      sprite.hpText.setText(String(Math.max(0, Math.round(hpLeft))));
-      this.tweens.add({
-        targets: sprite.body,
-        alpha: 0.3,
-        yoyo: true,
-        duration: 90,
-        repeat: 1
-      });
-      return;
-    }
-
-    if (event.type === "death") {
-      const unitId = String(event.payload.unitId ?? "");
-      const sprite = this.units.get(unitId);
-      if (!sprite) {
-        return;
-      }
-      this.tweens.add({
-        targets: [sprite.body, sprite.hpText, sprite.nameText],
-        alpha: 0,
-        duration: 220,
-        onComplete: () => {
-          sprite.body.destroy();
-          sprite.hpText.destroy();
-          sprite.nameText.destroy();
-          this.units.delete(unitId);
+        if ((q + r) % 4 === 0) {
+          this.add
+            .text(x, y, tileType[0].toUpperCase(), {
+              fontFamily: "monospace",
+              fontSize: "11px",
+              color: "#d7e4f4"
+            })
+            .setOrigin(0.5)
+            .setAlpha(0.7);
         }
-      });
+      }
     }
   }
 
-  private createOrUpdateUnit(unit: BattleUnitSnapshot): void {
-    const color = unit.playerId.endsWith("1") || unit.playerId.startsWith("p1") ? 0xff6b35 : 0x2a9d8f;
-    const existing = this.units.get(unit.id);
-    if (existing) {
-      existing.body.setPosition(this.worldX(unit.x), this.worldY(unit.y));
-      existing.hpText.setPosition(this.worldX(unit.x), this.worldY(unit.y) - 10);
-      existing.hpText.setText(String(unit.hp));
-      existing.nameText.setPosition(this.worldX(unit.x), this.worldY(unit.y) + 10);
-      return;
+  private drawUnits(): void {
+    for (const unit of DEMO_UNITS) {
+      const { x, y } = axialToWorld(unit.q, unit.r);
+
+      const body = this.add.circle(x, y, 15, unit.color, 0.96);
+      body.setStrokeStyle(2, 0xe6edf6, 0.9);
+
+      this.add
+        .text(x, y - 23, unit.name, {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#f4f8ff"
+        })
+        .setOrigin(0.5);
+
+      this.add
+        .text(x, y + 1, unit.role[0], {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#091018"
+        })
+        .setOrigin(0.5);
+
+      this.add
+        .text(x, y + 22, `HP ${unit.hp}`, {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#c8d7e8"
+        })
+        .setOrigin(0.5);
     }
+  }
 
-    const body = this.add.rectangle(this.worldX(unit.x), this.worldY(unit.y), 38, 38, color, 0.95);
-    body.setStrokeStyle(2, 0xe5f3ff, 0.85);
+  private drawLegend(): void {
+    const panel = this.add.rectangle(760, 120, 180, 170, 0x101a24, 0.88);
+    panel.setStrokeStyle(1, 0x31465c, 0.95);
 
-    const hpText = this.add.text(this.worldX(unit.x), this.worldY(unit.y) - 10, String(unit.hp), {
-      fontFamily: "monospace",
-      fontSize: "11px",
-      color: "#f4f8ff"
+    this.add
+      .text(760, 52, "Tile Types", {
+        fontFamily: "monospace",
+        fontSize: "14px",
+        color: "#e7f0fb"
+      })
+      .setOrigin(0.5);
+
+    TILE_LABELS.forEach((item, index) => {
+      const y = 78 + index * 24;
+      this.add.rectangle(700, y, 14, 14, TILE_COLORS[item.type], 0.95).setStrokeStyle(1, 0xe8f0fb, 0.7);
+      this.add
+        .text(715, y - 6, item.label, {
+          fontFamily: "monospace",
+          fontSize: "12px",
+          color: "#d3dfec"
+        })
+        .setOrigin(0, 0);
     });
-    hpText.setOrigin(0.5);
-
-    const nameText = this.add.text(this.worldX(unit.x), this.worldY(unit.y) + 10, unit.unitId.split(":").at(-1) ?? "u", {
-      fontFamily: "monospace",
-      fontSize: "9px",
-      color: "#b8c4d1"
-    });
-    nameText.setOrigin(0.5);
-
-    this.units.set(unit.id, { body, hpText, nameText });
-  }
-
-  private clearUnits(): void {
-    for (const sprite of this.units.values()) {
-      sprite.body.destroy();
-      sprite.hpText.destroy();
-      sprite.nameText.destroy();
-    }
-    this.units.clear();
-  }
-
-  private worldX(gridX: number): number {
-    return gridX * CELL + CELL / 2;
-  }
-
-  private worldY(gridY: number): number {
-    return gridY * CELL + CELL / 2;
   }
 }
