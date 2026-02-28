@@ -73,6 +73,8 @@ This repository includes a production stack for a permanent public domain:
 - `Dockerfile.web.prod`
 - `infra/prod/Caddyfile`
 - `infra/prod/deploy_prod.sh`
+- `.github/workflows/deploy-prod.yml`
+- `.github/workflows/uptime-check.yml`
 
 ### 1. Prerequisites on your VPS
 
@@ -94,6 +96,14 @@ Edit `infra/prod/.env.prod`:
 
 ```env
 DOMAIN=play.example.com
+BASIC_AUTH_USER=ops
+BASIC_AUTH_PASSWORD_HASH=<bcrypt_hash>
+```
+
+Generate bcrypt hash:
+
+```bash
+docker run --rm caddy:2.8-alpine caddy hash-password --plaintext 'strong-password'
 ```
 
 ### 3. Deploy
@@ -104,7 +114,37 @@ bash infra/prod/deploy_prod.sh
 
 After DNS propagation, Caddy automatically provisions and renews TLS certificates.
 
-### 4. Update deployment
+### 4. Health and readiness endpoints
+
+- Public health: `https://<domain>/healthz`
+- Public readiness (checks web client upstream): `https://<domain>/readyz`
+- Protected service/metrics routes:
+  - `https://<domain>/metrics`
+  - `https://<domain>/services/game-data/health`
+  - `https://<domain>/services/player/health`
+  - `https://<domain>/services/matchmaking/health`
+  - `https://<domain>/services/battle/health`
+  - `https://<domain>/services/economy/health`
+
+### 5. Auto-deploy on push to main
+
+Configure GitHub repository secrets listed in:
+- `infra/prod/SECRETS.md`
+
+Then every push to `main` triggers:
+- `.github/workflows/deploy-prod.yml`
+
+### 6. Automated uptime checks
+
+Scheduled checks run every 10 minutes via:
+- `.github/workflows/uptime-check.yml`
+
+It validates:
+- public health endpoint;
+- readiness endpoint;
+- one protected service endpoint via HTTP basic auth.
+
+### 7. Update deployment manually
 
 ```bash
 git pull

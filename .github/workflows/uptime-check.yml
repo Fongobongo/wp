@@ -1,0 +1,35 @@
+name: Production Uptime Check
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  uptime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public health endpoint
+        env:
+          PROD_HEALTHCHECK_URL: ${{ secrets.PROD_HEALTHCHECK_URL }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 "$PROD_HEALTHCHECK_URL"
+
+      - name: Check readiness endpoint
+        env:
+          PROD_READINESS_URL: ${{ secrets.PROD_READINESS_URL }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 "$PROD_READINESS_URL"
+
+      - name: Check protected service route
+        env:
+          PROD_PROTECTED_URL: ${{ secrets.PROD_PROTECTED_URL }}
+          PROD_BASIC_AUTH_USER: ${{ secrets.PROD_BASIC_AUTH_USER }}
+          PROD_BASIC_AUTH_PASSWORD: ${{ secrets.PROD_BASIC_AUTH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 15 \
+            -u "${PROD_BASIC_AUTH_USER}:${PROD_BASIC_AUTH_PASSWORD}" \
+            "$PROD_PROTECTED_URL"

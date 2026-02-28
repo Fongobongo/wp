@@ -11,6 +11,49 @@
     Referrer-Policy "strict-origin-when-cross-origin"
   }
 
-  reverse_proxy web-client:4173
-}
+  # Public health endpoints.
+  handle_path /healthz {
+    respond "ok" 200
+  }
 
+  handle_path /readyz {
+    reverse_proxy web-client:4173
+  }
+
+  # Protect operational/service routes with basic auth.
+  @protected path /metrics* /services*
+  basicauth @protected {
+    {$BASIC_AUTH_USER} {$BASIC_AUTH_PASSWORD_HASH}
+  }
+
+  # Aggregated metrics endpoint (starts with one service; easy to expand).
+  handle_path /metrics {
+    reverse_proxy game-data-service:4001
+  }
+
+  # Internal service gateway endpoints (auth protected).
+  handle_path /services/game-data/* {
+    reverse_proxy game-data-service:4001
+  }
+
+  handle_path /services/player/* {
+    reverse_proxy player-service:4002
+  }
+
+  handle_path /services/matchmaking/* {
+    reverse_proxy matchmaking-service:4003
+  }
+
+  handle_path /services/battle/* {
+    reverse_proxy battle-service:4004
+  }
+
+  handle_path /services/economy/* {
+    reverse_proxy economy-service:4005
+  }
+
+  # Public game client.
+  handle {
+    reverse_proxy web-client:4173
+  }
+}

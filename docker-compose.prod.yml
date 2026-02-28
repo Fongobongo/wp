@@ -1,4 +1,84 @@
 services:
+  game-data-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/game-data-service", "run", "dev"]
+    environment:
+      GAME_DATA_PORT: 4001
+      LOG_LEVEL: info
+    expose:
+      - "4001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  player-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/player-service", "run", "dev"]
+    environment:
+      PLAYER_PORT: 4002
+      LOG_LEVEL: info
+    expose:
+      - "4002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4002/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  matchmaking-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/matchmaking-service", "run", "dev"]
+    environment:
+      MATCHMAKING_PORT: 4003
+      BATTLE_SERVICE_URL: http://battle-service:4004
+      BATTLE_WS_URL: wss://${DOMAIN}
+      LOG_LEVEL: info
+    expose:
+      - "4003"
+    depends_on:
+      battle-service:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4003/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  battle-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/battle-service", "run", "dev"]
+    environment:
+      BATTLE_PORT: 4004
+      LOG_LEVEL: info
+    expose:
+      - "4004"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4004/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  economy-service:
+    build: .
+    command: ["npm", "--workspace", "@warprotocol/economy-service", "run", "dev"]
+    environment:
+      ECONOMY_PORT: 4005
+      LOG_LEVEL: info
+    expose:
+      - "4005"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4005/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
   web-client:
     build:
       context: .
@@ -6,12 +86,34 @@ services:
     restart: unless-stopped
     expose:
       - "4173"
+    environment:
+      VITE_GAME_DATA_URL: https://${DOMAIN}/services/game-data
+      VITE_PLAYER_URL: https://${DOMAIN}/services/player
+      VITE_MATCHMAKING_URL: https://${DOMAIN}/services/matchmaking
+      VITE_BATTLE_URL: https://${DOMAIN}/services/battle
+      VITE_ECONOMY_URL: https://${DOMAIN}/services/economy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4173/"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
 
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
     depends_on:
-      - web-client
+      web-client:
+        condition: service_started
+      game-data-service:
+        condition: service_started
+      player-service:
+        condition: service_started
+      matchmaking-service:
+        condition: service_started
+      battle-service:
+        condition: service_started
+      economy-service:
+        condition: service_started
     ports:
       - "80:80"
       - "443:443"
@@ -21,6 +123,13 @@ services:
       - caddy_config:/config
     environment:
       DOMAIN: ${DOMAIN}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER}
+      BASIC_AUTH_PASSWORD_HASH: ${BASIC_AUTH_PASSWORD_HASH}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
 
 volumes:
   caddy_data:
