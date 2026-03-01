@@ -10,6 +10,26 @@ import {
   unmountBattleGame
 } from "./game/runtime.js";
 
+function colorToCssHex(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+function createDragPreview(color: number): HTMLDivElement {
+  const node = document.createElement("div");
+  node.style.width = "20px";
+  node.style.height = "20px";
+  node.style.borderRadius = "50%";
+  node.style.border = "2px solid #e6edf6";
+  node.style.background = colorToCssHex(color);
+  node.style.boxShadow = "0 0 0 1px rgba(0, 0, 0, 0.35)";
+  node.style.position = "fixed";
+  node.style.left = "-9999px";
+  node.style.top = "-9999px";
+  node.style.pointerEvents = "none";
+  document.body.appendChild(node);
+  return node;
+}
+
 export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const [isDragOverBoard, setIsDragOverBoard] = useState(false);
@@ -106,6 +126,11 @@ export default function App() {
                   }
                   event.dataTransfer.setData("text/unit-id", unit.id);
                   event.dataTransfer.effectAllowed = "move";
+                  const preview = createDragPreview(unit.color);
+                  event.dataTransfer.setDragImage(preview, 10, 10);
+                  window.setTimeout(() => {
+                    preview.remove();
+                  }, 0);
                   selectUnitForPlacement(unit.id);
                 }}
                 onDragEnd={() => {

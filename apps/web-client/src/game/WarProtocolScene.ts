@@ -65,38 +65,6 @@ function axialToWorld(q: number, r: number): { x: number; y: number } {
   return { x, y };
 }
 
-function worldToAxial(x: number, y: number): { q: number; r: number } {
-  const px = x - ORIGIN_X;
-  const py = y - ORIGIN_Y;
-  const q = (Math.sqrt(3) / 3 * px - (1 / 3) * py) / HEX_SIZE;
-  const r = ((2 / 3) * py) / HEX_SIZE;
-  return { q, r };
-}
-
-function roundAxial(q: number, r: number): { q: number; r: number } {
-  const x = q;
-  const z = r;
-  const y = -x - z;
-
-  let rx = Math.round(x);
-  let ry = Math.round(y);
-  let rz = Math.round(z);
-
-  const xDiff = Math.abs(rx - x);
-  const yDiff = Math.abs(ry - y);
-  const zDiff = Math.abs(rz - z);
-
-  if (xDiff > yDiff && xDiff > zDiff) {
-    rx = -ry - rz;
-  } else if (yDiff > zDiff) {
-    ry = -rx - rz;
-  } else {
-    rz = -rx - ry;
-  }
-
-  return { q: rx, r: rz };
-}
-
 function pickTileType(q: number, r: number): TileType {
   const roll = (q * 11 + r * 7 + q * r * 3) % 9;
   if (roll === 0) {
@@ -181,24 +149,48 @@ export class WarProtocolScene extends Phaser.Scene {
     if (!this.reserveUnits.has(unitId) || this.units.has(unitId)) {
       return;
     }
-
-    const raw = worldToAxial(worldX, worldY);
-    const rounded = roundAxial(raw.q, raw.r);
-    const q = Math.round(rounded.q);
-    const r = Math.round(rounded.r);
-
-    if (q < 0 || q >= COLS || r < 0 || r >= ROWS) {
+    const snappedTile = this.findClosestTileForDrop(worldX, worldY);
+    if (!snappedTile) {
       this.statusText.setText("Drop target is outside battlefield.");
       return;
     }
 
-    const destinationKey = this.tileKey(q, r);
+    const destinationKey = this.tileKey(snappedTile.q, snappedTile.r);
     if (this.occupiedTiles.has(destinationKey)) {
       this.statusText.setText("Target hex is occupied.");
       return;
     }
 
-    this.placeReserveUnit(unitId, q, r);
+    this.placeReserveUnit(unitId, snappedTile.q, snappedTile.r);
+  }
+
+  private findClosestTileForDrop(
+    worldX: number,
+    worldY: number
+  ): { q: number; r: number } | null {
+    let bestTile: { q: number; r: number } | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const [, tile] of this.tiles) {
+      const center = axialToWorld(tile.q, tile.r);
+      const dx = worldX - center.x;
+      const dy = worldY - center.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestTile = { q: tile.q, r: tile.r };
+      }
+    }
+
+    if (!bestTile) {
+      return null;
+    }
+
+    if (bestDistance > HEX_SIZE) {
+      return null;
+    }
+
+    return bestTile;
   }
 
   private drawHexBoard(): void {
