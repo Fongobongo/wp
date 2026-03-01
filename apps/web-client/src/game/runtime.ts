@@ -71,18 +71,36 @@ export function onTurnStateChange(
     remainingActions: number;
   }) => void
 ): () => void {
-  if (!sceneRef) {
-    return () => undefined;
-  }
+  let attachedEmitter: Phaser.Events.EventEmitter | null = null;
+  let handler:
+    | ((payload: {
+        currentTeam: "Blue" | "Red";
+        turnNumber: number;
+        remainingActions: number;
+      }) => void)
+    | null = null;
+  let disposed = false;
 
-  const handler = (payload: {
-    currentTeam: "Blue" | "Red";
-    turnNumber: number;
-    remainingActions: number;
-  }) => listener(payload);
+  const tryAttach = (): void => {
+    if (disposed || !sceneRef?.events || attachedEmitter) {
+      return;
+    }
 
-  sceneRef.events.on("turnStateChanged", handler);
+    handler = (payload) => listener(payload);
+    sceneRef.events.on("turnStateChanged", handler);
+    attachedEmitter = sceneRef.events;
+  };
+
+  tryAttach();
+  const attachPoll = attachedEmitter ? null : window.setInterval(tryAttach, 50);
+
   return () => {
-    sceneRef?.events.off("turnStateChanged", handler);
+    disposed = true;
+    if (attachPoll !== null) {
+      window.clearInterval(attachPoll);
+    }
+    if (attachedEmitter && handler) {
+      attachedEmitter.off("turnStateChanged", handler);
+    }
   };
 }
