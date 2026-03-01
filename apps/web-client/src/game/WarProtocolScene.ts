@@ -8,6 +8,26 @@ const ORIGIN_X = 150;
 const ORIGIN_Y = 110;
 
 type TileType = "plain" | "cover" | "elevation" | "energy" | "trap";
+type CoordKey = `${number},${number}`;
+
+type TileNode = {
+  q: number;
+  r: number;
+  type: TileType;
+  polygon: Phaser.GameObjects.Polygon;
+};
+
+type UnitState = (typeof DEMO_UNITS)[number] & {
+  q: number;
+  r: number;
+};
+
+type UnitSprite = {
+  state: UnitState;
+  root: Phaser.GameObjects.Container;
+  body: Phaser.GameObjects.Arc;
+  hpLabel: Phaser.GameObjects.Text;
+};
 
 const TILE_COLORS: Record<TileType, number> = {
   plain: 0x31445a,
@@ -61,6 +81,12 @@ function pickTileType(q: number, r: number): TileType {
 }
 
 export class WarProtocolScene extends Phaser.Scene {
+  private readonly tiles = new Map<CoordKey, TileNode>();
+  private readonly units = new Map<string, UnitSprite>();
+  private readonly occupiedTiles = new Map<CoordKey, string>();
+  private selectedUnitId: string | null = null;
+  private statusText!: Phaser.GameObjects.Text;
+
   constructor() {
     super("war-protocol-scene");
   }
@@ -70,6 +96,8 @@ export class WarProtocolScene extends Phaser.Scene {
     this.drawHexBoard();
     this.drawUnits();
     this.drawLegend();
+    this.drawStatusLine();
+    this.refreshHighlights();
   }
 
   private drawHexBoard(): void {
@@ -83,6 +111,10 @@ export class WarProtocolScene extends Phaser.Scene {
 
         const tile = this.add.polygon(x, y, points, fillColor, 0.85);
         tile.setStrokeStyle(2, 0x1b2a38, 0.85);
+        tile.setInteractive({ useHandCursor: true });
+        tile.on("pointerdown", () => this.onTileClicked(q, r));
+
+        this.tiles.set(this.tileKey(q, r), { q, r, type: tileType, polygon: tile });
 
         if ((q + r) % 4 === 0) {
           this.add
@@ -99,35 +131,51 @@ export class WarProtocolScene extends Phaser.Scene {
   }
 
   private drawUnits(): void {
-    for (const unit of DEMO_UNITS) {
-      const { x, y } = axialToWorld(unit.q, unit.r);
+    for (const source of DEMO_UNITS) {
+      const state: UnitState = { ...source };
+      const { x, y } = axialToWorld(state.q, state.r);
 
-      const body = this.add.circle(x, y, 15, unit.color, 0.96);
+      const body = this.add.circle(0, 0, 15, state.color, 0.96);
       body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
-      this.add
-        .text(x, y - 23, unit.name, {
+      const nameLabel = this.add
+        .text(0, -23, state.name, {
           fontFamily: "monospace",
           fontSize: "10px",
           color: "#f4f8ff"
         })
         .setOrigin(0.5);
 
-      this.add
-        .text(x, y + 1, unit.role[0], {
+      const roleLabel = this.add
+        .text(0, 1, state.role[0], {
           fontFamily: "monospace",
           fontSize: "12px",
           color: "#091018"
         })
         .setOrigin(0.5);
 
-      this.add
-        .text(x, y + 22, `HP ${unit.hp}`, {
+      const hpLabel = this.add
+        .text(0, 22, `HP ${state.hp}`, {
           fontFamily: "monospace",
           fontSize: "10px",
           color: "#c8d7e8"
         })
         .setOrigin(0.5);
+
+      const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
+      root.setSize(38, 38);
+      root.setInteractive(
+        new Phaser.Geom.Circle(0, 0, 18),
+        Phaser.Geom.Circle.Contains
+      );
+      root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+        pointer.event.stopPropagation();
+        this.onUnitSelected(state.id);
+      });
+      root.setDepth(10);
+
+      this.units.set(state.id, { state, root, body, hpLabel });
+      this.occupiedTiles.set(this.tileKey(state.q, state.r), state.id);
     }
   }
 
@@ -153,6 +201,125 @@ export class WarProtocolScene extends Phaser.Scene {
           color: "#d3dfec"
         })
         .setOrigin(0, 0);
+      });
+  }
+
+  private drawStatusLine(): void {
+    this.statusText = this.add
+      .text(36, 585, "Select a unit, then click a highlighted hex to move.", {
+        fontFamily: "monospace",
+        fontSize: "13px",
+        color: "#e7f0fb"
+      })
+      .setOrigin(0, 0.5);
+  }
+
+  private onUnitSelected(unitId: string): void {
+    this.selectedUnitId = unitId;
+    const unit = this.units.get(unitId);
+    if (!unit) {
+      return;
+    }
+
+    this.statusText.setText(
+      `${unit.state.name} selected. Move range: ${unit.state.move} hexes.`
+    );
+    this.refreshHighlights();
+  }
+
+  private onTileClicked(q: number, r: number): void {
+    if (!this.selectedUnitId) {
+      this.statusText.setText("Select a unit first.");
+      return;
+    }
+
+    const unit = this.units.get(this.selectedUnitId);
+    if (!unit) {
+      return;
+    }
+
+    const destinationKey = this.tileKey(q, r);
+    const occupiedBy = this.occupiedTiles.get(destinationKey);
+    if (occupiedBy && occupiedBy !== unit.state.id) {
+      this.statusText.setText("Target hex is occupied.");
+      return;
+    }
+
+    const distance = this.hexDistance(unit.state.q, unit.state.r, q, r);
+    if (distance === 0) {
+      this.statusText.setText("Unit is already on this hex.");
+      return;
+    }
+    if (distance > unit.state.move) {
+      this.statusText.setText(
+        `Out of range. ${unit.state.name} can move up to ${unit.state.move} hexes.`
+      );
+      return;
+    }
+
+    const fromKey = this.tileKey(unit.state.q, unit.state.r);
+    this.occupiedTiles.delete(fromKey);
+    this.occupiedTiles.set(destinationKey, unit.state.id);
+
+    unit.state.q = q;
+    unit.state.r = r;
+    const { x, y } = axialToWorld(q, r);
+
+    this.tweens.add({
+      targets: unit.root,
+      x,
+      y,
+      duration: 180,
+      ease: "Sine.Out"
     });
+
+    this.statusText.setText(`${unit.state.name} moved to (${q}, ${r}).`);
+    this.refreshHighlights();
+  }
+
+  private refreshHighlights(): void {
+    const selected = this.selectedUnitId ? this.units.get(this.selectedUnitId) : null;
+
+    for (const [, tile] of this.tiles) {
+      const baseColor = TILE_COLORS[tile.type];
+      const key = this.tileKey(tile.q, tile.r);
+      tile.polygon.setFillStyle(baseColor, 0.85);
+      tile.polygon.setStrokeStyle(2, 0x1b2a38, 0.85);
+
+      if (!selected) {
+        continue;
+      }
+
+      const isOccupied = this.occupiedTiles.has(key);
+      const distance = this.hexDistance(selected.state.q, selected.state.r, tile.q, tile.r);
+      const inRange = distance > 0 && distance <= selected.state.move;
+
+      if (inRange && !isOccupied) {
+        tile.polygon.setFillStyle(baseColor, 1);
+        tile.polygon.setStrokeStyle(3, 0xf4ce74, 0.95);
+      }
+    }
+
+    for (const [, unit] of this.units) {
+      if (this.selectedUnitId === unit.state.id) {
+        unit.body.setStrokeStyle(3, 0xfff1a6, 1);
+        unit.root.setDepth(15);
+      } else {
+        unit.body.setStrokeStyle(2, 0xe6edf6, 0.9);
+        unit.root.setDepth(10);
+      }
+      unit.hpLabel.setText(`HP ${unit.state.hp}`);
+    }
+  }
+
+  private tileKey(q: number, r: number): CoordKey {
+    return `${q},${r}`;
+  }
+
+  private hexDistance(aq: number, ar: number, bq: number, br: number): number {
+    const dq = aq - bq;
+    const dr = ar - br;
+    const ds = (aq + ar) - (bq + br);
+    return (Math.abs(dq) + Math.abs(dr) + Math.abs(ds)) / 2;
   }
 }
