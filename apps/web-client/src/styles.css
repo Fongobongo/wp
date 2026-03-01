@@ -129,6 +129,15 @@ body {
   gap: 4px;
 }
 
+.unit-card.is-selected {
+  border-color: #8cd7a2;
+  box-shadow: inset 0 0 0 1px #8cd7a2;
+}
+
+.unit-card.is-deployed {
+  opacity: 0.88;
+}
+
 .unit-name {
   font-size: 0.95rem;
   font-weight: 700;
@@ -142,6 +151,26 @@ body {
 .unit-stats {
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.deploy-button {
+  margin-top: 6px;
+  border: 1px solid #4a6178;
+  background: linear-gradient(180deg, #26384a, #1a2835);
+  color: #eef5ff;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.deploy-button:hover:enabled {
+  border-color: #9be7b0;
+}
+
+.deploy-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

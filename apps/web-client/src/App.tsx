@@ -3,7 +3,9 @@ import { DEMO_UNITS } from "./game/demoData.js";
 import {
   endCurrentTurn,
   mountBattleGame,
+  onRosterStateChange,
   onTurnStateChange,
+  selectUnitForPlacement,
   unmountBattleGame
 } from "./game/runtime.js";
 
@@ -12,7 +14,11 @@ export default function App() {
   const [turnState, setTurnState] = useState({
     currentTeam: "Blue" as "Blue" | "Red",
     turnNumber: 1,
-    remainingActions: 3
+    remainingActions: 0
+  });
+  const [rosterState, setRosterState] = useState({
+    deployedUnitIds: [] as string[],
+    selectedReserveUnitId: null as string | null
   });
 
   useEffect(() => {
@@ -24,9 +30,13 @@ export default function App() {
     const unsubscribeTurnState = onTurnStateChange((state) => {
       setTurnState(state);
     });
+    const unsubscribeRosterState = onRosterStateChange((state) => {
+      setRosterState(state);
+    });
 
     return () => {
       unsubscribeTurnState();
+      unsubscribeRosterState();
       unmountBattleGame();
     };
   }, []);
@@ -35,7 +45,7 @@ export default function App() {
     <div className="page">
       <header className="hero">
         <h1>WAR PROTOCOL</h1>
-        <p>Browser MVP: hex battlefield with a starter roster of five units.</p>
+        <p>Empty hex battlefield: deploy units from roster, then play turn-based movement.</p>
       </header>
 
       <section className="panel board-panel">
@@ -58,18 +68,34 @@ export default function App() {
       </section>
 
       <section className="panel roster-panel">
-        <h2>Starter Units (5)</h2>
+        <h2>Starter Units (Deploy to Field)</h2>
         <div className="roster-grid">
-          {DEMO_UNITS.map((unit) => (
-            <article className="unit-card" key={unit.id}>
-              <div className="unit-name">{unit.name}</div>
-              <div className="unit-stats">Team {unit.team}</div>
-              <div className="unit-role">{unit.role}</div>
-              <div className="unit-stats">HP {unit.hp}</div>
-              <div className="unit-stats">ATK {unit.attack}</div>
-              <div className="unit-stats">Move {unit.move}</div>
-            </article>
-          ))}
+          {DEMO_UNITS.map((unit) => {
+            const deployed = rosterState.deployedUnitIds.includes(unit.id);
+            const selectedForDeploy = rosterState.selectedReserveUnitId === unit.id;
+
+            return (
+              <article
+                className={`unit-card${selectedForDeploy ? " is-selected" : ""}${deployed ? " is-deployed" : ""}`}
+                key={unit.id}
+              >
+                <div className="unit-name">{unit.name}</div>
+                <div className="unit-stats">Team {unit.team}</div>
+                <div className="unit-role">{unit.role}</div>
+                <div className="unit-stats">HP {unit.hp}</div>
+                <div className="unit-stats">ATK {unit.attack}</div>
+                <div className="unit-stats">Move {unit.move}</div>
+                <button
+                  type="button"
+                  className="deploy-button"
+                  disabled={deployed}
+                  onClick={() => selectUnitForPlacement(unit.id)}
+                >
+                  {deployed ? "Deployed" : selectedForDeploy ? "Deploying..." : "Deploy to Field"}
+                </button>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>

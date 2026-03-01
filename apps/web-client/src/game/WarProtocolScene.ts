@@ -17,7 +17,9 @@ type TileNode = {
   polygon: Phaser.GameObjects.Polygon;
 };
 
-type UnitState = (typeof DEMO_UNITS)[number] & {
+type UnitTemplate = (typeof DEMO_UNITS)[number];
+
+type UnitState = UnitTemplate & {
   q: number;
   r: number;
 };
@@ -83,9 +85,12 @@ function pickTileType(q: number, r: number): TileType {
 export class WarProtocolScene extends Phaser.Scene {
   private readonly tiles = new Map<CoordKey, TileNode>();
   private readonly units = new Map<string, UnitSprite>();
+  private readonly reserveUnits = new Map<string, UnitTemplate>();
   private readonly occupiedTiles = new Map<CoordKey, string>();
   private readonly actedThisTurn = new Set<string>();
+
   private selectedUnitId: string | null = null;
+  private selectedReserveUnitId: string | null = null;
   private statusText!: Phaser.GameObjects.Text;
   private currentTeam: "Blue" | "Red" = "Blue";
   private turnNumber = 1;
@@ -97,12 +102,47 @@ export class WarProtocolScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor("#0d1219");
     this.cameras.main.roundPixels = true;
+
+    for (const unit of DEMO_UNITS) {
+      this.reserveUnits.set(unit.id, unit);
+    }
+
     this.drawHexBoard();
-    this.drawUnits();
     this.drawLegend();
     this.drawStatusLine();
     this.refreshHighlights();
     this.emitTurnState();
+    this.emitRosterState();
+  }
+
+  public endTurn(): void {
+    this.selectedUnitId = null;
+    this.selectedReserveUnitId = null;
+    this.actedThisTurn.clear();
+    this.currentTeam = this.currentTeam === "Blue" ? "Red" : "Blue";
+    this.turnNumber += 1;
+    this.statusText.setText(`Turn ${this.turnNumber} started. Active team: ${this.currentTeam}.`);
+    this.emitTurnState();
+    this.emitRosterState();
+    this.refreshHighlights();
+  }
+
+  public selectReserveUnit(unitId: string): void {
+    if (this.units.has(unitId)) {
+      this.statusText.setText("This unit is already deployed.");
+      return;
+    }
+
+    const unit = this.reserveUnits.get(unitId);
+    if (!unit) {
+      return;
+    }
+
+    this.selectedUnitId = null;
+    this.selectedReserveUnitId = unitId;
+    this.statusText.setText(`Deploy ${unit.name}: click any empty hex.`);
+    this.emitRosterState();
+    this.refreshHighlights();
   }
 
   private drawHexBoard(): void {
@@ -135,53 +175,65 @@ export class WarProtocolScene extends Phaser.Scene {
     }
   }
 
-  private drawUnits(): void {
-    for (const source of DEMO_UNITS) {
-      const state: UnitState = { ...source };
-      const { x, y } = axialToWorld(state.q, state.r);
+  private createUnitSprite(state: UnitState): UnitSprite {
+    const { x, y } = axialToWorld(state.q, state.r);
 
-      const body = this.add.circle(0, 0, 15, state.color, 0.96);
-      body.setStrokeStyle(2, 0xe6edf6, 0.9);
+    const body = this.add.circle(0, 0, 15, state.color, 0.96);
+    body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
-      const nameLabel = this.add
-        .text(0, -23, state.name, {
-          fontFamily: "monospace",
-          fontSize: "10px",
-          color: "#f4f8ff"
-        })
-        .setOrigin(0.5);
+    const nameLabel = this.add
+      .text(0, -23, state.name, {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#f4f8ff"
+      })
+      .setOrigin(0.5);
 
-      const roleLabel = this.add
-        .text(0, 1, state.role[0], {
-          fontFamily: "monospace",
-          fontSize: "12px",
-          color: "#091018"
-        })
-        .setOrigin(0.5);
+    const roleLabel = this.add
+      .text(0, 1, state.role[0], {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#091018"
+      })
+      .setOrigin(0.5);
 
-      const hpLabel = this.add
-        .text(0, 22, `HP ${state.hp}`, {
-          fontFamily: "monospace",
-          fontSize: "10px",
-          color: "#c8d7e8"
-        })
-        .setOrigin(0.5);
+    const hpLabel = this.add
+      .text(0, 22, `HP ${state.hp}`, {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#c8d7e8"
+      })
+      .setOrigin(0.5);
 
-      const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
-      root.setSize(38, 38);
-      root.setInteractive(
-        new Phaser.Geom.Circle(0, 0, 18),
-        Phaser.Geom.Circle.Contains
-      );
-      root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-        pointer.event.stopPropagation();
-        this.onUnitSelected(state.id);
-      });
-      root.setDepth(10);
+    const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
+    root.setSize(38, 38);
+    root.setInteractive(new Phaser.Geom.Circle(0, 0, 18), Phaser.Geom.Circle.Contains);
+    root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      pointer.event.stopPropagation();
+      this.onUnitSelected(state.id);
+    });
+    root.setDepth(10);
 
-      this.units.set(state.id, { state, root, body, hpLabel });
-      this.occupiedTiles.set(this.tileKey(state.q, state.r), state.id);
+    return { state, root, body, hpLabel };
+  }
+
+  private placeReserveUnit(unitId: string, q: number, r: number): void {
+    const source = this.reserveUnits.get(unitId);
+    if (!source || this.units.has(unitId)) {
+      return;
     }
+
+    const state: UnitState = { ...source, q, r };
+    const sprite = this.createUnitSprite(state);
+
+    this.units.set(unitId, sprite);
+    this.occupiedTiles.set(this.tileKey(q, r), unitId);
+    this.selectedReserveUnitId = null;
+
+    this.statusText.setText(`${state.name} deployed at (${q}, ${r}).`);
+    this.emitTurnState();
+    this.emitRosterState();
+    this.refreshHighlights();
   }
 
   private drawLegend(): void {
@@ -206,12 +258,12 @@ export class WarProtocolScene extends Phaser.Scene {
           color: "#d3dfec"
         })
         .setOrigin(0, 0);
-      });
+    });
   }
 
   private drawStatusLine(): void {
     this.statusText = this.add
-      .text(36, 585, "Select a unit, then click a highlighted hex to move.", {
+      .text(36, 585, "Deploy units from the roster, then move them on your turn.", {
         fontFamily: "monospace",
         fontSize: "13px",
         color: "#e7f0fb"
@@ -220,11 +272,13 @@ export class WarProtocolScene extends Phaser.Scene {
   }
 
   private onUnitSelected(unitId: string): void {
-    this.selectedUnitId = unitId;
     const unit = this.units.get(unitId);
     if (!unit) {
       return;
     }
+
+    this.selectedReserveUnitId = null;
+    this.selectedUnitId = unitId;
 
     if (unit.state.team !== this.currentTeam) {
       this.statusText.setText(`It is ${this.currentTeam} team turn.`);
@@ -239,13 +293,23 @@ export class WarProtocolScene extends Phaser.Scene {
       return;
     }
 
-    this.statusText.setText(
-      `Turn ${this.turnNumber} (${this.currentTeam}): ${unit.state.name} selected.`
-    );
+    this.statusText.setText(`Turn ${this.turnNumber} (${this.currentTeam}): ${unit.state.name} selected.`);
+    this.emitRosterState();
     this.refreshHighlights();
   }
 
   private onTileClicked(q: number, r: number): void {
+    const destinationKey = this.tileKey(q, r);
+
+    if (this.selectedReserveUnitId) {
+      if (this.occupiedTiles.has(destinationKey)) {
+        this.statusText.setText("Target hex is occupied.");
+        return;
+      }
+      this.placeReserveUnit(this.selectedReserveUnitId, q, r);
+      return;
+    }
+
     if (!this.selectedUnitId) {
       this.statusText.setText("Select a unit first.");
       return;
@@ -256,7 +320,6 @@ export class WarProtocolScene extends Phaser.Scene {
       return;
     }
 
-    const destinationKey = this.tileKey(q, r);
     const occupiedBy = this.occupiedTiles.get(destinationKey);
     if (occupiedBy && occupiedBy !== unit.state.id) {
       this.statusText.setText("Target hex is occupied.");
@@ -269,9 +332,7 @@ export class WarProtocolScene extends Phaser.Scene {
       return;
     }
     if (distance > unit.state.move) {
-      this.statusText.setText(
-        `Out of range. ${unit.state.name} can move up to ${unit.state.move} hexes.`
-      );
+      this.statusText.setText(`Out of range. ${unit.state.name} can move up to ${unit.state.move} hexes.`);
       return;
     }
 
@@ -308,6 +369,12 @@ export class WarProtocolScene extends Phaser.Scene {
       tile.polygon.setFillStyle(baseColor, 0.85);
       tile.polygon.setStrokeStyle(2, 0x1b2a38, 0.85);
 
+      if (this.selectedReserveUnitId && !this.occupiedTiles.has(key)) {
+        tile.polygon.setFillStyle(baseColor, 1);
+        tile.polygon.setStrokeStyle(3, 0x9be7b0, 0.95);
+        continue;
+      }
+
       if (!selected) {
         continue;
       }
@@ -338,22 +405,18 @@ export class WarProtocolScene extends Phaser.Scene {
     }
   }
 
-  public endTurn(): void {
-    this.selectedUnitId = null;
-    this.actedThisTurn.clear();
-    this.currentTeam = this.currentTeam === "Blue" ? "Red" : "Blue";
-    this.turnNumber += 1;
-    this.statusText.setText(`Turn ${this.turnNumber} started. Active team: ${this.currentTeam}.`);
-    this.emitTurnState();
-    this.refreshHighlights();
-  }
-
   private autoEndTurnIfNeeded(): void {
     const available = this.getRemainingActions();
     if (available > 0) {
       return;
     }
-    this.endTurn();
+
+    const hasAnyUnitsForTeam = Array.from(this.units.values()).some(
+      (unit) => unit.state.team === this.currentTeam
+    );
+    if (hasAnyUnitsForTeam) {
+      this.endTurn();
+    }
   }
 
   private getRemainingActions(): number {
@@ -371,6 +434,13 @@ export class WarProtocolScene extends Phaser.Scene {
       currentTeam: this.currentTeam,
       turnNumber: this.turnNumber,
       remainingActions: this.getRemainingActions()
+    });
+  }
+
+  private emitRosterState(): void {
+    this.events.emit("rosterStateChanged", {
+      deployedUnitIds: Array.from(this.units.keys()),
+      selectedReserveUnitId: this.selectedReserveUnitId
     });
   }
 

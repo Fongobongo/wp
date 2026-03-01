@@ -7,6 +7,17 @@ let sceneRef: WarProtocolScene | null = null;
 
 const BASE_HEIGHT = 620;
 
+type TurnState = {
+  currentTeam: "Blue" | "Red";
+  turnNumber: number;
+  remainingActions: number;
+};
+
+type RosterState = {
+  deployedUnitIds: string[];
+  selectedReserveUnitId: string | null;
+};
+
 function resizeGameToContainer(container: HTMLDivElement): void {
   if (!game) {
     return;
@@ -14,6 +25,38 @@ function resizeGameToContainer(container: HTMLDivElement): void {
 
   const width = Math.max(320, Math.floor(container.clientWidth));
   game.scale.resize(width, BASE_HEIGHT);
+}
+
+function subscribeToSceneEvent<TPayload>(
+  eventName: string,
+  listener: (payload: TPayload) => void
+): () => void {
+  let attachedEmitter: Phaser.Events.EventEmitter | null = null;
+  let handler: ((payload: TPayload) => void) | null = null;
+  let disposed = false;
+
+  const tryAttach = (): void => {
+    if (disposed || !sceneRef?.events || attachedEmitter) {
+      return;
+    }
+
+    handler = (payload) => listener(payload);
+    sceneRef.events.on(eventName, handler);
+    attachedEmitter = sceneRef.events;
+  };
+
+  tryAttach();
+  const attachPoll = attachedEmitter ? null : window.setInterval(tryAttach, 50);
+
+  return () => {
+    disposed = true;
+    if (attachPoll !== null) {
+      window.clearInterval(attachPoll);
+    }
+    if (attachedEmitter && handler) {
+      attachedEmitter.off(eventName, handler);
+    }
+  };
 }
 
 export function mountBattleGame(container: HTMLDivElement): void {
@@ -70,43 +113,14 @@ export function endCurrentTurn(): void {
   sceneRef?.endTurn();
 }
 
-export function onTurnStateChange(
-  listener: (state: {
-    currentTeam: "Blue" | "Red";
-    turnNumber: number;
-    remainingActions: number;
-  }) => void
-): () => void {
-  let attachedEmitter: Phaser.Events.EventEmitter | null = null;
-  let handler:
-    | ((payload: {
-        currentTeam: "Blue" | "Red";
-        turnNumber: number;
-        remainingActions: number;
-      }) => void)
-    | null = null;
-  let disposed = false;
+export function selectUnitForPlacement(unitId: string): void {
+  sceneRef?.selectReserveUnit(unitId);
+}
 
-  const tryAttach = (): void => {
-    if (disposed || !sceneRef?.events || attachedEmitter) {
-      return;
-    }
+export function onTurnStateChange(listener: (state: TurnState) => void): () => void {
+  return subscribeToSceneEvent<TurnState>("turnStateChanged", listener);
+}
 
-    handler = (payload) => listener(payload);
-    sceneRef.events.on("turnStateChanged", handler);
-    attachedEmitter = sceneRef.events;
-  };
-
-  tryAttach();
-  const attachPoll = attachedEmitter ? null : window.setInterval(tryAttach, 50);
-
-  return () => {
-    disposed = true;
-    if (attachPoll !== null) {
-      window.clearInterval(attachPoll);
-    }
-    if (attachedEmitter && handler) {
-      attachedEmitter.off("turnStateChanged", handler);
-    }
-  };
+export function onRosterStateChange(listener: (state: RosterState) => void): () => void {
+  return subscribeToSceneEvent<RosterState>("rosterStateChanged", listener);
 }
