@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DEMO_UNITS } from "./game/demoData.js";
 import {
+  deployUnitByClientPoint,
   endCurrentTurn,
   mountBattleGame,
   onRosterStateChange,
@@ -11,6 +12,7 @@ import {
 
 export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
+  const [isDragOverBoard, setIsDragOverBoard] = useState(false);
   const [turnState, setTurnState] = useState({
     currentTeam: "Blue" as "Blue" | "Red",
     turnNumber: 1,
@@ -64,7 +66,26 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="battle-canvas" ref={boardRef} />
+        <div
+          className={`battle-canvas${isDragOverBoard ? " is-drag-over" : ""}`}
+          ref={boardRef}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragOverBoard(true);
+          }}
+          onDragLeave={() => {
+            setIsDragOverBoard(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDragOverBoard(false);
+            const unitId = event.dataTransfer.getData("text/unit-id");
+            if (!unitId) {
+              return;
+            }
+            deployUnitByClientPoint(unitId, event.clientX, event.clientY);
+          }}
+        />
       </section>
 
       <section className="panel roster-panel">
@@ -78,6 +99,18 @@ export default function App() {
               <article
                 className={`unit-card${selectedForDeploy ? " is-selected" : ""}${deployed ? " is-deployed" : ""}`}
                 key={unit.id}
+                draggable={!deployed}
+                onDragStart={(event) => {
+                  if (deployed) {
+                    return;
+                  }
+                  event.dataTransfer.setData("text/unit-id", unit.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  selectUnitForPlacement(unit.id);
+                }}
+                onDragEnd={() => {
+                  setIsDragOverBoard(false);
+                }}
               >
                 <div className="unit-name">{unit.name}</div>
                 <div className="unit-stats">Team {unit.team}</div>

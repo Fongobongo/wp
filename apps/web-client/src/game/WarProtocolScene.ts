@@ -65,6 +65,38 @@ function axialToWorld(q: number, r: number): { x: number; y: number } {
   return { x, y };
 }
 
+function worldToAxial(x: number, y: number): { q: number; r: number } {
+  const px = x - ORIGIN_X;
+  const py = y - ORIGIN_Y;
+  const q = (Math.sqrt(3) / 3 * px - (1 / 3) * py) / HEX_SIZE;
+  const r = ((2 / 3) * py) / HEX_SIZE;
+  return { q, r };
+}
+
+function roundAxial(q: number, r: number): { q: number; r: number } {
+  const x = q;
+  const z = r;
+  const y = -x - z;
+
+  let rx = Math.round(x);
+  let ry = Math.round(y);
+  let rz = Math.round(z);
+
+  const xDiff = Math.abs(rx - x);
+  const yDiff = Math.abs(ry - y);
+  const zDiff = Math.abs(rz - z);
+
+  if (xDiff > yDiff && xDiff > zDiff) {
+    rx = -ry - rz;
+  } else if (yDiff > zDiff) {
+    ry = -rx - rz;
+  } else {
+    rz = -rx - ry;
+  }
+
+  return { q: rx, r: rz };
+}
+
 function pickTileType(q: number, r: number): TileType {
   const roll = (q * 11 + r * 7 + q * r * 3) % 9;
   if (roll === 0) {
@@ -143,6 +175,30 @@ export class WarProtocolScene extends Phaser.Scene {
     this.statusText.setText(`Deploy ${unit.name}: click any empty hex.`);
     this.emitRosterState();
     this.refreshHighlights();
+  }
+
+  public deployReserveUnitAtWorld(unitId: string, worldX: number, worldY: number): void {
+    if (!this.reserveUnits.has(unitId) || this.units.has(unitId)) {
+      return;
+    }
+
+    const raw = worldToAxial(worldX, worldY);
+    const rounded = roundAxial(raw.q, raw.r);
+    const q = Math.round(rounded.q);
+    const r = Math.round(rounded.r);
+
+    if (q < 0 || q >= COLS || r < 0 || r >= ROWS) {
+      this.statusText.setText("Drop target is outside battlefield.");
+      return;
+    }
+
+    const destinationKey = this.tileKey(q, r);
+    if (this.occupiedTiles.has(destinationKey)) {
+      this.statusText.setText("Target hex is occupied.");
+      return;
+    }
+
+    this.placeReserveUnit(unitId, q, r);
   }
 
   private drawHexBoard(): void {

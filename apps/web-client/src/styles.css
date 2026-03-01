@@ -108,6 +108,11 @@ body {
   background: #0d1219;
 }
 
+.battle-canvas.is-drag-over {
+  border-color: #9be7b0;
+  box-shadow: inset 0 0 0 2px #9be7b066;
+}
+
 .battle-canvas canvas {
   display: block;
   width: 100% !important;
@@ -127,6 +132,10 @@ body {
   padding: 10px;
   display: grid;
   gap: 4px;
+}
+
+.unit-card[draggable="true"] {
+  cursor: grab;
 }
 
 .unit-card.is-selected {

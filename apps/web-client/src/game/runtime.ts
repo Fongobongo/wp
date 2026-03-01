@@ -117,6 +117,31 @@ export function selectUnitForPlacement(unitId: string): void {
   sceneRef?.selectReserveUnit(unitId);
 }
 
+export function deployUnitByClientPoint(
+  unitId: string,
+  clientX: number,
+  clientY: number
+): void {
+  if (!game || !sceneRef) {
+    return;
+  }
+
+  const canvas = game.canvas;
+  if (!canvas) {
+    return;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+
+  const worldX = ((clientX - rect.left) / rect.width) * game.scale.width;
+  const worldY = ((clientY - rect.top) / rect.height) * game.scale.height;
+
+  sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
+}
+
 export function onTurnStateChange(listener: (state: TurnState) => void): () => void {
   return subscribeToSceneEvent<TurnState>("turnStateChanged", listener);
 }
