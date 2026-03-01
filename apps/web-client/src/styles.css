@@ -100,11 +100,18 @@ body {
 
 .battle-canvas {
   width: 100%;
+  height: 620px;
   min-height: 620px;
   border: 1px solid #33475e;
   border-radius: 10px;
   overflow: hidden;
   background: #0d1219;
+}
+
+.battle-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 620px !important;
 }
 
 .roster-grid {
@@ -153,6 +160,11 @@ body {
   }
 
   .battle-canvas {
+    height: 420px;
     min-height: 420px;
+  }
+
+  .battle-canvas canvas {
+    height: 420px !important;
   }
 }

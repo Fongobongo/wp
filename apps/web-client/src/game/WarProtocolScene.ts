@@ -58,8 +58,8 @@ function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
 }
 
 function axialToWorld(q: number, r: number): { x: number; y: number } {
-  const x = ORIGIN_X + HEX_SIZE * Math.sqrt(3) * (q + r / 2);
-  const y = ORIGIN_Y + HEX_SIZE * 1.5 * r;
+  const x = Math.round(ORIGIN_X + HEX_SIZE * Math.sqrt(3) * (q + r / 2));
+  const y = Math.round(ORIGIN_Y + HEX_SIZE * 1.5 * r);
   return { x, y };
 }
 
@@ -96,6 +96,7 @@ export class WarProtocolScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor("#0d1219");
+    this.cameras.main.roundPixels = true;
     this.drawHexBoard();
     this.drawUnits();
     this.drawLegend();

@@ -27,9 +27,15 @@ export function mountBattleGame(container: HTMLDivElement): void {
     type: Phaser.AUTO,
     width: Math.max(320, Math.floor(container.clientWidth)),
     height: BASE_HEIGHT,
+    autoRound: true,
     parent: container,
     backgroundColor: "#0d1219",
     scene: [sceneRef],
+    render: {
+      pixelArt: false,
+      antialias: true,
+      roundPixels: true
+    },
     physics: {
       default: "arcade"
     },
