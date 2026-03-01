@@ -1,6 +1,7 @@
 export type DemoUnit = {
   id: string;
   name: string;
+  team: "Blue" | "Red";
   role: "Assault" | "Defender" | "Ranger" | "Mage" | "Healer";
   hp: number;
   attack: number;
@@ -14,6 +15,7 @@ export const DEMO_UNITS: DemoUnit[] = [
   {
     id: "u-vanguard",
     name: "Vanguard",
+    team: "Blue",
     role: "Assault",
     hp: 130,
     attack: 28,
@@ -25,6 +27,7 @@ export const DEMO_UNITS: DemoUnit[] = [
   {
     id: "u-bastion",
     name: "Bastion",
+    team: "Blue",
     role: "Defender",
     hp: 175,
     attack: 16,
@@ -36,6 +39,7 @@ export const DEMO_UNITS: DemoUnit[] = [
   {
     id: "u-ranger",
     name: "Longshot",
+    team: "Blue",
     role: "Ranger",
     hp: 102,
     attack: 25,
@@ -47,6 +51,7 @@ export const DEMO_UNITS: DemoUnit[] = [
   {
     id: "u-arcanist",
     name: "Arcanist",
+    team: "Red",
     role: "Mage",
     hp: 95,
     attack: 31,
@@ -58,6 +63,7 @@ export const DEMO_UNITS: DemoUnit[] = [
   {
     id: "u-medic",
     name: "Medic",
+    team: "Red",
     role: "Healer",
     hp: 108,
     attack: 14,

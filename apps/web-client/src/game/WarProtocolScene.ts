@@ -84,8 +84,11 @@ export class WarProtocolScene extends Phaser.Scene {
   private readonly tiles = new Map<CoordKey, TileNode>();
   private readonly units = new Map<string, UnitSprite>();
   private readonly occupiedTiles = new Map<CoordKey, string>();
+  private readonly actedThisTurn = new Set<string>();
   private selectedUnitId: string | null = null;
   private statusText!: Phaser.GameObjects.Text;
+  private currentTeam: "Blue" | "Red" = "Blue";
+  private turnNumber = 1;
 
   constructor() {
     super("war-protocol-scene");
@@ -98,6 +101,7 @@ export class WarProtocolScene extends Phaser.Scene {
     this.drawLegend();
     this.drawStatusLine();
     this.refreshHighlights();
+    this.emitTurnState();
   }
 
   private drawHexBoard(): void {
@@ -221,8 +225,21 @@ export class WarProtocolScene extends Phaser.Scene {
       return;
     }
 
+    if (unit.state.team !== this.currentTeam) {
+      this.statusText.setText(`It is ${this.currentTeam} team turn.`);
+      this.selectedUnitId = null;
+      this.refreshHighlights();
+      return;
+    }
+    if (this.actedThisTurn.has(unitId)) {
+      this.statusText.setText(`${unit.state.name} already acted this turn.`);
+      this.selectedUnitId = null;
+      this.refreshHighlights();
+      return;
+    }
+
     this.statusText.setText(
-      `${unit.state.name} selected. Move range: ${unit.state.move} hexes.`
+      `Turn ${this.turnNumber} (${this.currentTeam}): ${unit.state.name} selected.`
     );
     this.refreshHighlights();
   }
@@ -273,7 +290,11 @@ export class WarProtocolScene extends Phaser.Scene {
       ease: "Sine.Out"
     });
 
-    this.statusText.setText(`${unit.state.name} moved to (${q}, ${r}).`);
+    this.actedThisTurn.add(unit.state.id);
+    this.selectedUnitId = null;
+    this.statusText.setText(`${unit.state.name} moved to (${q}, ${r}) and ended action.`);
+    this.emitTurnState();
+    this.autoEndTurnIfNeeded();
     this.refreshHighlights();
   }
 
@@ -301,6 +322,9 @@ export class WarProtocolScene extends Phaser.Scene {
     }
 
     for (const [, unit] of this.units) {
+      const isCurrentTeam = unit.state.team === this.currentTeam;
+      const hasActed = this.actedThisTurn.has(unit.state.id);
+
       if (this.selectedUnitId === unit.state.id) {
         unit.body.setStrokeStyle(3, 0xfff1a6, 1);
         unit.root.setDepth(15);
@@ -308,8 +332,45 @@ export class WarProtocolScene extends Phaser.Scene {
         unit.body.setStrokeStyle(2, 0xe6edf6, 0.9);
         unit.root.setDepth(10);
       }
+      unit.root.setAlpha(isCurrentTeam ? (hasActed ? 0.55 : 1) : 0.8);
       unit.hpLabel.setText(`HP ${unit.state.hp}`);
     }
+  }
+
+  public endTurn(): void {
+    this.selectedUnitId = null;
+    this.actedThisTurn.clear();
+    this.currentTeam = this.currentTeam === "Blue" ? "Red" : "Blue";
+    this.turnNumber += 1;
+    this.statusText.setText(`Turn ${this.turnNumber} started. Active team: ${this.currentTeam}.`);
+    this.emitTurnState();
+    this.refreshHighlights();
+  }
+
+  private autoEndTurnIfNeeded(): void {
+    const available = this.getRemainingActions();
+    if (available > 0) {
+      return;
+    }
+    this.endTurn();
+  }
+
+  private getRemainingActions(): number {
+    let count = 0;
+    for (const [, unit] of this.units) {
+      if (unit.state.team === this.currentTeam && !this.actedThisTurn.has(unit.state.id)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private emitTurnState(): void {
+    this.events.emit("turnStateChanged", {
+      currentTeam: this.currentTeam,
+      turnNumber: this.turnNumber,
+      remainingActions: this.getRemainingActions()
+    });
   }
 
   private tileKey(q: number, r: number): CoordKey {

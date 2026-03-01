@@ -24,6 +24,11 @@ Before changing code or content, always align with:
 4. Use GitHub SSH alias `openclaw` for repository operations.
 5. Default remote must be `openclaw:Fongobongo/wp.git` unless explicitly changed by the user.
 
+## Deployment Rule
+1. After each committed change that affects externally visible behavior, automatically redeploy production via `infra/prod/deploy_prod.sh`.
+2. After redeploy, verify `https://play.hadoop21.click/` and `https://play.hadoop21.click/healthz` from the server.
+3. Report deployment verification results in the user response.
+
 ## Non-Negotiable Product Rules
 1. Gameplay first: blockchain must not reduce gameplay quality.
 2. No pay-to-win: paid content must not grant combat power.
