@@ -228,17 +228,25 @@ export class WarProtocolScene extends Phaser.Scene {
     }
   }
 
-  private createUnitSprite(state: UnitState): UnitSprite {
-    const { x, y } = axialToWorld(state.q, state.r);
+  private getTileCenter(q: number, r: number): { x: number; y: number } {
+    const tile = this.tiles.get(this.tileKey(q, r));
+    if (tile) {
+      return { x: tile.polygon.x, y: tile.polygon.y };
+    }
+    return axialToWorld(q, r);
+  }
 
-    const body = this.add.circle(0, 0, 17, state.color, 0.96);
+  private createUnitSprite(state: UnitState): UnitSprite {
+    const { x, y } = this.getTileCenter(state.q, state.r);
+
+    const body = this.add.circle(0, 0, 19, state.color, 0.96);
     body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
     const shortName = compactUnitName(state.name);
     const nameLabel = this.add
-      .text(0, -10, shortName, {
+      .text(0, -11, shortName, {
         fontFamily: "monospace",
-        fontSize: "7px",
+        fontSize: "8px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
@@ -252,15 +260,15 @@ export class WarProtocolScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 10, `${state.hp}`, {
+      .text(0, 11, `${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "7px",
+        fontSize: "8px",
         color: "#c8d7e8"
       })
       .setOrigin(0.5);
 
     const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
-    root.setSize(36, 36);
+    root.setSize(40, 40);
     root.setInteractive(new Phaser.Geom.Circle(0, 0, 18), Phaser.Geom.Circle.Contains);
     root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       pointer.event.stopPropagation();
@@ -396,7 +404,7 @@ export class WarProtocolScene extends Phaser.Scene {
 
     unit.state.q = q;
     unit.state.r = r;
-    const { x, y } = axialToWorld(q, r);
+    const { x, y } = this.getTileCenter(q, r);
 
     this.tweens.add({
       targets: unit.root,
