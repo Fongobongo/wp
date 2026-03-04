@@ -226,35 +226,35 @@ export class WarProtocolScene extends Phaser.Scene {
   private createUnitSprite(state: UnitState): UnitSprite {
     const { x, y } = axialToWorld(state.q, state.r);
 
-    const body = this.add.circle(0, 0, 15, state.color, 0.96);
+    const body = this.add.circle(0, 0, 12, state.color, 0.96);
     body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
     const nameLabel = this.add
-      .text(0, -23, state.name, {
+      .text(0, -10, state.name, {
         fontFamily: "monospace",
-        fontSize: "10px",
+        fontSize: "8px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
 
     const roleLabel = this.add
-      .text(0, 1, state.role[0], {
+      .text(0, 0, state.role[0], {
         fontFamily: "monospace",
-        fontSize: "12px",
+        fontSize: "10px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 22, `HP ${state.hp}`, {
+      .text(0, 11, `HP ${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "10px",
+        fontSize: "8px",
         color: "#c8d7e8"
       })
       .setOrigin(0.5);
 
     const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
-    root.setSize(38, 38);
+    root.setSize(30, 30);
     root.setInteractive(new Phaser.Geom.Circle(0, 0, 18), Phaser.Geom.Circle.Contains);
     root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       pointer.event.stopPropagation();
