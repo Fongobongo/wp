@@ -31,6 +31,10 @@ type UnitSprite = {
   hpLabel: Phaser.GameObjects.Text;
 };
 
+function compactUnitName(name: string): string {
+  return name.replace(/[^a-zA-Z]/g, "").slice(0, 4).toUpperCase() || "UNIT";
+}
+
 const TILE_COLORS: Record<TileType, number> = {
   plain: 0x31445a,
   cover: 0x2d5f4a,
@@ -229,10 +233,11 @@ export class WarProtocolScene extends Phaser.Scene {
     const body = this.add.circle(0, 0, 12, state.color, 0.96);
     body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
+    const shortName = compactUnitName(state.name);
     const nameLabel = this.add
-      .text(0, -10, state.name, {
+      .text(0, -5, shortName, {
         fontFamily: "monospace",
-        fontSize: "8px",
+        fontSize: "6px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
@@ -240,15 +245,15 @@ export class WarProtocolScene extends Phaser.Scene {
     const roleLabel = this.add
       .text(0, 0, state.role[0], {
         fontFamily: "monospace",
-        fontSize: "10px",
+        fontSize: "9px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 11, `HP ${state.hp}`, {
+      .text(0, 6, `${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "8px",
+        fontSize: "6px",
         color: "#c8d7e8"
       })
       .setOrigin(0.5);
@@ -449,7 +454,7 @@ export class WarProtocolScene extends Phaser.Scene {
         unit.root.setDepth(10);
       }
       unit.root.setAlpha(isCurrentTeam ? (hasActed ? 0.55 : 1) : 0.8);
-      unit.hpLabel.setText(`HP ${unit.state.hp}`);
+      unit.hpLabel.setText(`${unit.state.hp}`);
     }
   }
 
