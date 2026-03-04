@@ -32,7 +32,7 @@ type UnitSprite = {
 };
 
 function compactUnitName(name: string): string {
-  return name.replace(/[^a-zA-Z]/g, "").slice(0, 4).toUpperCase() || "UNIT";
+  return name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "UNIT";
 }
 
 const TILE_COLORS: Record<TileType, number> = {
@@ -54,7 +54,8 @@ const TILE_LABELS: Array<{ type: TileType; label: string }> = [
 function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
   const points: Phaser.Types.Math.Vector2Like[] = [];
   for (let i = 0; i < 6; i += 1) {
-    const angle = Phaser.Math.DegToRad(60 * i - 30);
+    // Pointy-top hex orientation to match axial->world conversion below.
+    const angle = Phaser.Math.DegToRad(60 * i - 90);
     points.push({
       x: size * Math.cos(angle),
       y: size * Math.sin(angle)
@@ -190,7 +191,7 @@ export class WarProtocolScene extends Phaser.Scene {
       return null;
     }
 
-    if (bestDistance > HEX_SIZE) {
+    if (bestDistance > HEX_SIZE * 0.92) {
       return null;
     }
 
@@ -230,14 +231,14 @@ export class WarProtocolScene extends Phaser.Scene {
   private createUnitSprite(state: UnitState): UnitSprite {
     const { x, y } = axialToWorld(state.q, state.r);
 
-    const body = this.add.circle(0, 0, 12, state.color, 0.96);
+    const body = this.add.circle(0, 0, 17, state.color, 0.96);
     body.setStrokeStyle(2, 0xe6edf6, 0.9);
 
     const shortName = compactUnitName(state.name);
     const nameLabel = this.add
-      .text(0, -5, shortName, {
+      .text(0, -10, shortName, {
         fontFamily: "monospace",
-        fontSize: "6px",
+        fontSize: "7px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
@@ -245,21 +246,21 @@ export class WarProtocolScene extends Phaser.Scene {
     const roleLabel = this.add
       .text(0, 0, state.role[0], {
         fontFamily: "monospace",
-        fontSize: "9px",
+        fontSize: "12px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 6, `${state.hp}`, {
+      .text(0, 10, `${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "6px",
+        fontSize: "7px",
         color: "#c8d7e8"
       })
       .setOrigin(0.5);
 
     const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
-    root.setSize(30, 30);
+    root.setSize(36, 36);
     root.setInteractive(new Phaser.Geom.Circle(0, 0, 18), Phaser.Geom.Circle.Contains);
     root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       pointer.event.stopPropagation();
