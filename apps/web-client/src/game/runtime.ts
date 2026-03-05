@@ -136,8 +136,17 @@ export function deployUnitByClientPoint(
     return;
   }
 
-  const worldX = ((clientX - rect.left) / rect.width) * game.scale.width;
-  const worldY = ((clientY - rect.top) / rect.height) * game.scale.height;
+  const scaleManager = game.scale as unknown as {
+    transformX?: (pageX: number) => number;
+    transformY?: (pageY: number) => number;
+  };
+
+  const worldX = scaleManager.transformX
+    ? scaleManager.transformX(clientX)
+    : ((clientX - rect.left) / rect.width) * game.scale.width;
+  const worldY = scaleManager.transformY
+    ? scaleManager.transformY(clientY)
+    : ((clientY - rect.top) / rect.height) * game.scale.height;
 
   sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
 }
