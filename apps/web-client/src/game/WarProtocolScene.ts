@@ -15,6 +15,8 @@ type TileNode = {
   r: number;
   type: TileType;
   polygon: Phaser.GameObjects.Polygon;
+  centerX: number;
+  centerY: number;
 };
 
 type UnitTemplate = (typeof DEMO_UNITS)[number];
@@ -177,9 +179,8 @@ export class WarProtocolScene extends Phaser.Scene {
     let bestDistance = Number.POSITIVE_INFINITY;
 
     for (const [, tile] of this.tiles) {
-      const center = axialToWorld(tile.q, tile.r);
-      const dx = worldX - center.x;
-      const dy = worldY - center.y;
+      const dx = worldX - tile.centerX;
+      const dy = worldY - tile.centerY;
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -211,12 +212,22 @@ export class WarProtocolScene extends Phaser.Scene {
         tile.setStrokeStyle(2, 0x1b2a38, 0.85);
         tile.setInteractive({ useHandCursor: true });
         tile.on("pointerdown", () => this.onTileClicked(q, r));
+        const bounds = tile.getBounds();
+        const centerX = bounds.centerX;
+        const centerY = bounds.centerY;
 
-        this.tiles.set(this.tileKey(q, r), { q, r, type: tileType, polygon: tile });
+        this.tiles.set(this.tileKey(q, r), {
+          q,
+          r,
+          type: tileType,
+          polygon: tile,
+          centerX,
+          centerY
+        });
 
         if ((q + r) % 4 === 0) {
           this.add
-            .text(x, y, tileType[0].toUpperCase(), {
+            .text(centerX, centerY, tileType[0].toUpperCase(), {
               fontFamily: "monospace",
               fontSize: "11px",
               color: "#d7e4f4"
@@ -231,7 +242,7 @@ export class WarProtocolScene extends Phaser.Scene {
   private getTileCenter(q: number, r: number): { x: number; y: number } {
     const tile = this.tiles.get(this.tileKey(q, r));
     if (tile) {
-      return { x: tile.polygon.x, y: tile.polygon.y };
+      return { x: tile.centerX, y: tile.centerY };
     }
     return axialToWorld(q, r);
   }
