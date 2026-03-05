@@ -131,23 +131,36 @@ export function deployUnitByClientPoint(
     return;
   }
 
+  // Keep reserve selection aligned with drag source.
+  sceneRef.selectReserveUnit(unitId);
+
+  if (typeof PointerEvent !== "undefined") {
+    const pointerEventInit: PointerEventInit = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true,
+      button: 0,
+      buttons: 1,
+      clientX,
+      clientY
+    };
+    canvas.dispatchEvent(new PointerEvent("pointermove", pointerEventInit));
+    canvas.dispatchEvent(new PointerEvent("pointerdown", pointerEventInit));
+    canvas.dispatchEvent(new PointerEvent("pointerup", {
+      ...pointerEventInit,
+      buttons: 0
+    }));
+    return;
+  }
+
   const rect = canvas.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) {
     return;
   }
-
-  const scaleManager = game.scale as unknown as {
-    transformX?: (pageX: number) => number;
-    transformY?: (pageY: number) => number;
-  };
-
-  const worldX = scaleManager.transformX
-    ? scaleManager.transformX(clientX)
-    : ((clientX - rect.left) / rect.width) * game.scale.width;
-  const worldY = scaleManager.transformY
-    ? scaleManager.transformY(clientY)
-    : ((clientY - rect.top) / rect.height) * game.scale.height;
-
+  const worldX = ((clientX - rect.left) / rect.width) * game.scale.width;
+  const worldY = ((clientY - rect.top) / rect.height) * game.scale.height;
   sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
 }
 
