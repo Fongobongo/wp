@@ -117,50 +117,25 @@ export function selectUnitForPlacement(unitId: string): void {
   sceneRef?.selectReserveUnit(unitId);
 }
 
-export function deployUnitByClientPoint(
+export function deployUnitByCanvasOffset(
   unitId: string,
-  clientX: number,
-  clientY: number
+  offsetX: number,
+  offsetY: number,
+  sourceWidth: number,
+  sourceHeight: number
 ): void {
   if (!game || !sceneRef) {
     return;
   }
-
-  const canvas = game.canvas;
-  if (!canvas) {
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
     return;
   }
 
   // Keep reserve selection aligned with drag source.
   sceneRef.selectReserveUnit(unitId);
 
-  if (typeof PointerEvent !== "undefined") {
-    const pointerEventInit: PointerEventInit = {
-      bubbles: true,
-      cancelable: true,
-      pointerId: 1,
-      pointerType: "mouse",
-      isPrimary: true,
-      button: 0,
-      buttons: 1,
-      clientX,
-      clientY
-    };
-    canvas.dispatchEvent(new PointerEvent("pointermove", pointerEventInit));
-    canvas.dispatchEvent(new PointerEvent("pointerdown", pointerEventInit));
-    canvas.dispatchEvent(new PointerEvent("pointerup", {
-      ...pointerEventInit,
-      buttons: 0
-    }));
-    return;
-  }
-
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) {
-    return;
-  }
-  const worldX = ((clientX - rect.left) / rect.width) * game.scale.width;
-  const worldY = ((clientY - rect.top) / rect.height) * game.scale.height;
+  const worldX = (offsetX / sourceWidth) * game.scale.width;
+  const worldY = (offsetY / sourceHeight) * game.scale.height;
   sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
 }
 
