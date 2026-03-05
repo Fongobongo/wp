@@ -104,17 +104,11 @@ export default function App() {
               return;
             }
             const nativeEvent = event.nativeEvent;
-            const target = nativeEvent.target as HTMLElement | null;
-            const width = target?.clientWidth || event.currentTarget.clientWidth;
-            const height = target?.clientHeight || event.currentTarget.clientHeight;
-            const offsetX =
-              typeof nativeEvent.offsetX === "number"
-                ? nativeEvent.offsetX
-                : event.clientX - event.currentTarget.getBoundingClientRect().left;
-            const offsetY =
-              typeof nativeEvent.offsetY === "number"
-                ? nativeEvent.offsetY
-                : event.clientY - event.currentTarget.getBoundingClientRect().top;
+            const width = event.currentTarget.clientWidth;
+            const height = event.currentTarget.clientHeight;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const offsetX = event.clientX - rect.left;
+            const offsetY = event.clientY - rect.top;
             deployUnitByCanvasOffset(unitId, offsetX, offsetY, width, height);
           }}
         />
