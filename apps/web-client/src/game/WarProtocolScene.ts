@@ -156,7 +156,7 @@ export class WarProtocolScene extends Phaser.Scene {
     if (!this.reserveUnits.has(unitId) || this.units.has(unitId)) {
       return;
     }
-    const snappedTile = this.findClosestTileForDrop(worldX, worldY);
+    const snappedTile = this.findTileAtPoint(worldX, worldY);
     if (!snappedTile) {
       this.statusText.setText("Drop target is outside battlefield.");
       return;
@@ -171,32 +171,31 @@ export class WarProtocolScene extends Phaser.Scene {
     this.placeReserveUnit(unitId, snappedTile.q, snappedTile.r);
   }
 
-  private findClosestTileForDrop(
+  private findTileAtPoint(
     worldX: number,
     worldY: number
   ): { q: number; r: number } | null {
-    let bestTile: { q: number; r: number } | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-
     for (const [, tile] of this.tiles) {
-      const dx = worldX - tile.centerX;
-      const dy = worldY - tile.centerY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestTile = { q: tile.q, r: tile.r };
+      const localX = worldX - tile.centerX;
+      const localY = worldY - tile.centerY;
+      if (this.isInsideHex(localX, localY)) {
+        return { q: tile.q, r: tile.r };
       }
     }
 
-    if (!bestTile) {
-      return null;
+    return null;
+  }
+
+  private isInsideHex(localX: number, localY: number): boolean {
+    const x = Math.abs(localX);
+    const y = Math.abs(localY);
+    const halfWidth = (Math.sqrt(3) / 2) * HEX_SIZE;
+
+    if (x > halfWidth || y > HEX_SIZE) {
+      return false;
     }
 
-    if (bestDistance > HEX_SIZE * 0.92) {
-      return null;
-    }
-
-    return bestTile;
+    return Math.sqrt(3) * y + x <= Math.sqrt(3) * HEX_SIZE + 0.01;
   }
 
   private drawHexBoard(): void {
