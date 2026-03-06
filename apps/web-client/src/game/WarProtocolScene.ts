@@ -2,17 +2,28 @@ import Phaser from "phaser";
 import { DEMO_UNITS } from "./demoData.js";
 
 const HEX_SIZE = 72;
-const TILE_Q = 0;
-const TILE_R = 0;
+const GRID_COLS = 2;
+const GRID_ROWS = 2;
 const TILE_FILL = 0x31445a;
 const TILE_STROKE = 0x1b2a38;
 const HIGHLIGHT_STROKE = 0x9be7b0;
+const HORIZONTAL_SPACING = Math.round(Math.sqrt(3) * HEX_SIZE + 20);
+const VERTICAL_SPACING = Math.round(HEX_SIZE * 1.95);
+
+const TILE_LAYOUT = [
+  { q: 0, r: 0, col: 0, row: 0 },
+  { q: 1, r: 0, col: 1, row: 0 },
+  { q: 0, r: 1, col: 0, row: 1 },
+  { q: 1, r: 1, col: 1, row: 1 }
+] as const;
 
 type CoordKey = `${number},${number}`;
 
 type TileNode = {
   q: number;
   r: number;
+  col: number;
+  row: number;
   graphics: Phaser.GameObjects.Graphics;
   centerX: number;
   centerY: number;
@@ -90,6 +101,8 @@ export class WarProtocolScene extends Phaser.Scene {
 
   private selectedReserveUnitId: string | null = null;
   private statusText!: Phaser.GameObjects.Text;
+  private boardOriginX = 0;
+  private boardOriginY = 0;
 
   constructor() {
     super("war-protocol-scene");
@@ -105,9 +118,9 @@ export class WarProtocolScene extends Phaser.Scene {
     }
 
     this.createStatusText();
-    this.ensureSingleTile();
+    this.ensureTiles();
     this.layoutScene();
-    this.statusText.setText("Drag the unit into the hex.");
+    this.statusText.setText("Drag the unit into any hex.");
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off("resize", this.handleResize, this);
@@ -129,7 +142,7 @@ export class WarProtocolScene extends Phaser.Scene {
     }
 
     this.selectedReserveUnitId = unitId;
-    this.statusText.setText(`Place ${unit.name} into the hex.`);
+    this.statusText.setText(`Place ${unit.name} into any empty hex.`);
     this.emitRosterState();
     this.refreshHighlights();
   }
@@ -141,7 +154,7 @@ export class WarProtocolScene extends Phaser.Scene {
 
     const tile = this.findTileAtPoint(worldX, worldY);
     if (!tile) {
-      this.statusText.setText("Drop target is outside the hex.");
+      this.statusText.setText("Drop target is outside the grid.");
       return;
     }
 
@@ -155,7 +168,6 @@ export class WarProtocolScene extends Phaser.Scene {
   }
 
   public getDebugState(): BattleDebugState {
-    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
     const units = Array.from(this.units.values())
       .map((unit) => {
         const tileCenter = this.getTileCenter(unit.state.q, unit.state.r);
@@ -173,26 +185,26 @@ export class WarProtocolScene extends Phaser.Scene {
       })
       .sort((left, right) => left.id.localeCompare(right.id));
 
+    const tiles = Array.from(this.tiles.values())
+      .map((tile) => ({
+        q: tile.q,
+        r: tile.r,
+        centerX: tile.centerX,
+        centerY: tile.centerY,
+        vertices: tile.vertices
+      }))
+      .sort((left, right) => left.r - right.r || left.q - right.q);
+
     return {
       board: {
-        cols: 1,
-        rows: 1,
+        cols: GRID_COLS,
+        rows: GRID_ROWS,
         hexSize: HEX_SIZE,
-        originX: tile?.centerX ?? this.scale.width / 2,
-        originY: tile?.centerY ?? this.scale.height / 2
+        originX: this.boardOriginX,
+        originY: this.boardOriginY
       },
       statusText: this.statusText?.text ?? "",
-      tiles: tile
-        ? [
-            {
-              q: tile.q,
-              r: tile.r,
-              centerX: tile.centerX,
-              centerY: tile.centerY,
-              vertices: tile.vertices
-            }
-          ]
-        : [],
+      tiles,
       units
     };
   }
@@ -212,33 +224,43 @@ export class WarProtocolScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
   }
 
-  private ensureSingleTile(): void {
-    const key = this.tileKey(TILE_Q, TILE_R);
-    if (this.tiles.has(key)) {
-      return;
+  private ensureTiles(): void {
+    for (const tileDef of TILE_LAYOUT) {
+      const key = this.tileKey(tileDef.q, tileDef.r);
+      if (this.tiles.has(key)) {
+        continue;
+      }
+
+      const graphics = this.add.graphics();
+      graphics.setDepth(1);
+
+      this.tiles.set(key, {
+        q: tileDef.q,
+        r: tileDef.r,
+        col: tileDef.col,
+        row: tileDef.row,
+        graphics,
+        centerX: 0,
+        centerY: 0,
+        vertices: []
+      });
     }
-
-    const graphics = this.add.graphics();
-    graphics.setDepth(1);
-
-    this.tiles.set(key, {
-      q: TILE_Q,
-      r: TILE_R,
-      graphics,
-      centerX: 0,
-      centerY: 0,
-      vertices: []
-    });
   }
 
   private layoutScene(): void {
-    const requestedCenterX = Math.round(this.scale.width / 2);
-    const requestedCenterY = Math.round(this.scale.height * 0.42);
-    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
+    const centerX = Math.round(this.scale.width / 2);
+    const centerY = Math.round(this.scale.height * 0.4);
+    const totalWidth = HORIZONTAL_SPACING * (GRID_COLS - 1);
+    const totalHeight = VERTICAL_SPACING * (GRID_ROWS - 1);
+    const startX = Math.round(centerX - totalWidth / 2);
+    const startY = Math.round(centerY - totalHeight / 2);
 
-    if (tile) {
-      tile.centerX = requestedCenterX;
-      tile.centerY = requestedCenterY;
+    this.boardOriginX = startX;
+    this.boardOriginY = startY;
+
+    for (const [, tile] of this.tiles) {
+      tile.centerX = Math.round(startX + tile.col * HORIZONTAL_SPACING);
+      tile.centerY = Math.round(startY + tile.row * VERTICAL_SPACING);
       tile.vertices = this.pointCache.map((point) => ({
         x: tile.centerX + point.x,
         y: tile.centerY + point.y
@@ -258,7 +280,7 @@ export class WarProtocolScene extends Phaser.Scene {
     if (!tile) {
       return {
         x: Math.round(this.scale.width / 2),
-        y: Math.round(this.scale.height * 0.42)
+        y: Math.round(this.scale.height * 0.4)
       };
     }
     return { x: tile.centerX, y: tile.centerY };
@@ -313,16 +335,16 @@ export class WarProtocolScene extends Phaser.Scene {
     this.occupiedTiles.set(this.tileKey(q, r), unitId);
     this.selectedReserveUnitId = null;
 
-    this.statusText.setText(`${state.name} deployed into the hex.`);
+    this.statusText.setText(`${state.name} deployed to hex (${q}, ${r}).`);
     this.emitRosterState();
     this.refreshHighlights();
   }
 
   private refreshHighlights(): void {
-    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
-    if (tile) {
-      const isAvailable = this.selectedReserveUnitId && !this.occupiedTiles.has(this.tileKey(TILE_Q, TILE_R));
-      this.redrawTile(tile, Boolean(isAvailable));
+    for (const [, tile] of this.tiles) {
+      const key = this.tileKey(tile.q, tile.r);
+      const isAvailable = Boolean(this.selectedReserveUnitId) && !this.occupiedTiles.has(key);
+      this.redrawTile(tile, isAvailable);
     }
 
     for (const [, unit] of this.units) {
@@ -353,14 +375,13 @@ export class WarProtocolScene extends Phaser.Scene {
   }
 
   private findTileAtPoint(worldX: number, worldY: number): { q: number; r: number } | null {
-    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
-    if (!tile) {
-      return null;
+    for (const [, tile] of this.tiles) {
+      if (this.isPointInsidePolygon(worldX, worldY, tile.vertices)) {
+        return { q: tile.q, r: tile.r };
+      }
     }
 
-    return this.isPointInsidePolygon(worldX, worldY, tile.vertices)
-      ? { q: tile.q, r: tile.r }
-      : null;
+    return null;
   }
 
   private isPointInsidePolygon(

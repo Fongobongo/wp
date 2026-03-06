@@ -38,6 +38,7 @@ declare global {
 
 const screenshotDir = path.resolve(process.cwd(), "artifacts/ui/screenshots");
 const UNIT_ID = "u-vanguard";
+const TARGET_TILE = { q: 1, r: 1 } as const;
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -251,38 +252,46 @@ test.beforeEach(async ({ page }) => {
   await page.waitForFunction(
     () => {
       const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
-      return Boolean(state && state.tiles.length === 1);
+      return Boolean(state && state.tiles.length === 4);
     },
     undefined,
     { timeout: 120_000 }
   );
 });
 
-test("deploys the only unit into the only valid hex", async ({ page }) => {
+test("deploys the only unit into the selected grid hex", async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
 
   const initialState = await readDebugState(page);
-  const tile = initialState.tiles[0];
+  expect(initialState.board.cols).toBe(2);
+  expect(initialState.board.rows).toBe(2);
+  expect(initialState.tiles).toHaveLength(4);
+
+  const tile = initialState.tiles.find(
+    (candidate) => candidate.q === TARGET_TILE.q && candidate.r === TARGET_TILE.r
+  );
+  expect(tile).toBeTruthy();
+
   const boardBox = await page.getByTestId("battle-board").boundingBox();
   expect(boardBox).not.toBeNull();
 
-  await dispatchHtml5Drag(page, UNIT_ID, boardBox!.x + tile.centerX, boardBox!.y + tile.centerY);
+  await dispatchHtml5Drag(page, UNIT_ID, boardBox!.x + tile!.centerX, boardBox!.y + tile!.centerY);
 
   await expect
     .poll(async () => {
       const state = await readDebugState(page);
       return state.units.map((unit) => `${unit.id}:${unit.q},${unit.r}`);
     })
-    .toEqual([`${UNIT_ID}:0,0`]);
+    .toEqual([`${UNIT_ID}:${TARGET_TILE.q},${TARGET_TILE.r}`]);
 
   const state = await readDebugState(page);
   const unit = state.units[0];
-  expect(unit.rootX).toBeCloseTo(tile.centerX, 1);
-  expect(unit.rootY).toBeCloseTo(tile.centerY, 1);
-  expect(state.statusText).toBe("Vanguard deployed into the hex.");
+  expect(unit.rootX).toBeCloseTo(tile!.centerX, 1);
+  expect(unit.rootY).toBeCloseTo(tile!.centerY, 1);
+  expect(state.statusText).toBe(`Vanguard deployed to hex (${TARGET_TILE.q}, ${TARGET_TILE.r}).`);
 
-  const boardPath = path.join(screenshotDir, "single-hex-board.png");
-  const pagePath = path.join(screenshotDir, "single-hex-page.png");
+  const boardPath = path.join(screenshotDir, "four-hex-board.png");
+  const pagePath = path.join(screenshotDir, "four-hex-page.png");
   const { buffer: canvasImage, box: canvasBox } = await captureCanvas(page);
   fs.writeFileSync(boardPath, canvasImage);
   await page.screenshot({ path: pagePath, fullPage: true });
@@ -303,7 +312,7 @@ test("deploys the only unit into the only valid hex", async ({ page }) => {
   expect(Math.abs(blob.centroidX - unit.tileCenterX * scaleX)).toBeLessThanOrEqual(2);
   expect(Math.abs(blob.centroidY - unit.tileCenterY * scaleY)).toBeLessThanOrEqual(2);
 
-  const scaledVertices = tile.vertices.map((vertex) => ({
+  const scaledVertices = tile!.vertices.map((vertex) => ({
     x: vertex.x * scaleX,
     y: vertex.y * scaleY
   }));
@@ -313,7 +322,7 @@ test("deploys the only unit into the only valid hex", async ({ page }) => {
   expect(insidePixels / blob.pixels.length).toBeGreaterThan(0.98);
 });
 
-test("rejects drops outside the hex", async ({ page }) => {
+test("rejects drops outside the four-hex grid", async ({ page }) => {
   const boardBox = await page.getByTestId("battle-board").boundingBox();
   expect(boardBox).not.toBeNull();
 
@@ -329,6 +338,6 @@ test("rejects drops outside the hex", async ({ page }) => {
     })
     .toEqual({
       unitCount: 0,
-      statusText: "Drop target is outside the hex."
+      statusText: "Drop target is outside the grid."
     });
 });

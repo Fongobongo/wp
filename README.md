@@ -62,11 +62,11 @@ npm run dev:battle
 
 ## Headless UI smoke coverage
 
-The repository includes a Playwright smoke suite for the current single-hex web MVP. It verifies:
+The repository includes a Playwright smoke suite for the current four-hex web MVP. It verifies:
 
-- drag-and-drop deployment of the reserve unit into the only valid hex;
-- rejection of drops outside that hex;
-- pixel-based checks that the rendered unit blob stays centered inside the hex polygon.
+- drag-and-drop deployment of the reserve unit into a selected grid hex;
+- rejection of drops outside the four-hex grid;
+- pixel-based checks that the rendered unit blob stays centered inside the target hex polygon.
 
 Run from the repository root:
 

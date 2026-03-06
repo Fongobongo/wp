@@ -60,13 +60,13 @@ export default function App() {
     <div className="page">
       <header className="hero">
         <h1>WAR PROTOCOL</h1>
-        <p>Single-hex deployment sandbox. Drag the only unit into the only valid hex.</p>
+        <p>Four-hex deployment sandbox. Drag the only unit into any empty hex.</p>
       </header>
 
       <section className="panel board-panel">
         <div className="board-header">
           <h2>Battlefield</h2>
-          <span className="board-note">One hex. One unit. One valid drop target.</span>
+          <span className="board-note">Four hexes. One unit. Drop into any empty hex.</span>
         </div>
         <div
           className={`battle-canvas${isDragOverBoard ? " is-drag-over" : ""}`}
@@ -134,7 +134,7 @@ export default function App() {
             <div className="unit-stats">ATK {unit.attack}</div>
             <div className="unit-stats">Move {unit.move}</div>
             <div className="unit-hint">
-              {deployed ? "Already deployed." : selectedForDeploy ? "Drop into the hex." : "Drag into the hex."}
+              {deployed ? "Already deployed." : selectedForDeploy ? "Drop into any hex." : "Drag into any hex."}
             </div>
           </article>
         </div>
