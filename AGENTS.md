@@ -31,8 +31,9 @@ Before changing code or content, always align with:
 
 ## UI Verification Rule
 1. After each frontend or interaction change, run `npm run test:ui`.
-2. Review the generated screenshots in `artifacts/ui/screenshots`.
-3. Treat a frontend change as incomplete if drag-and-drop smoke coverage or screenshot generation fails.
+2. When investigating a visual bug reported on production, also run `npm run test:ui:prod`.
+3. Review the generated screenshots in `artifacts/ui/screenshots`.
+4. Treat a frontend change as incomplete if drag-and-drop smoke coverage, visual snapshot comparison, or screenshot generation fails.
 
 ## Non-Negotiable Product Rules
 1. Gameplay first: blockchain must not reduce gameplay quality.

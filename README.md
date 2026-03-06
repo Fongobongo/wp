@@ -55,6 +55,7 @@ npm run lint
 npm run test
 npm run build
 npm run test:ui
+npm run test:ui:prod
 npm run dev:web
 npm run dev:battle
 ```
@@ -67,6 +68,12 @@ Run from the repository root:
 
 ```bash
 npm run test:ui
+```
+
+To run the same smoke suite against the public production URL:
+
+```bash
+npm run test:ui:prod
 ```
 
 Artifacts are written to:

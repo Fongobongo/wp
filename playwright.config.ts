@@ -2,6 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 const chromiumExecutablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? "/usr/bin/chromium";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173";
+const useWebServer = process.env.PLAYWRIGHT_USE_WEBSERVER !== "0";
 
 export default defineConfig({
   testDir: "./apps/web-client/e2e",
@@ -16,7 +18,7 @@ export default defineConfig({
   ],
   outputDir: "artifacts/ui/test-results",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL,
     headless: true,
     viewport: { width: 1280, height: 900 },
     trace: "retain-on-failure",
@@ -27,10 +29,12 @@ export default defineConfig({
       args: ["--no-sandbox", "--disable-dev-shm-usage"]
     }
   },
-  webServer: {
-    command: "npm --workspace @warprotocol/web-client run dev -- --host 127.0.0.1 --port 4173 --strictPort",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+  webServer: useWebServer
+    ? {
+        command: "npm --workspace @warprotocol/web-client run dev -- --host 127.0.0.1 --port 4173 --strictPort",
+        url: "http://127.0.0.1:4173",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000
+      }
+    : undefined
 });

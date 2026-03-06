@@ -13,6 +13,7 @@
     "test": "npm run -ws test",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
+    "test:ui:prod": "PLAYWRIGHT_BASE_URL=https://play.hadoop21.click PLAYWRIGHT_USE_WEBSERVER=0 playwright test",
     "lint": "npm run -ws lint",
     "dev:web": "npm --workspace @warprotocol/web-client run dev",
     "dev:game-data": "npm --workspace @warprotocol/game-data-service run dev",

@@ -163,7 +163,7 @@ test("deploys multiple units with drag and drop, keeps them centered, and captur
   const boardBox = await page.getByTestId("battle-board").boundingBox();
   expect(boardBox).not.toBeNull();
 
-  await page.screenshot({
+  const boardImage = await page.screenshot({
     path: boardPath,
     clip: {
       x: boardBox!.x,
@@ -171,6 +171,9 @@ test("deploys multiple units with drag and drop, keeps them centered, and captur
       width: boardBox!.width,
       height: boardBox!.height
     }
+  });
+  expect(boardImage).toMatchSnapshot("multi-unit-battle-board.png", {
+    maxDiffPixelRatio: 0.0025
   });
   await page.screenshot({ path: pagePath, fullPage: true });
 
