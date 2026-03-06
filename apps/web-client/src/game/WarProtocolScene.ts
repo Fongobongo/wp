@@ -1,20 +1,19 @@
 import Phaser from "phaser";
 import { DEMO_UNITS } from "./demoData.js";
 
-const HEX_SIZE = 34;
-const COLS = 8;
-const ROWS = 7;
-const ORIGIN_X = 150;
-const ORIGIN_Y = 110;
+const HEX_SIZE = 72;
+const TILE_Q = 0;
+const TILE_R = 0;
+const TILE_FILL = 0x31445a;
+const TILE_STROKE = 0x1b2a38;
+const HIGHLIGHT_STROKE = 0x9be7b0;
 
-type TileType = "plain" | "cover" | "elevation" | "energy" | "trap";
 type CoordKey = `${number},${number}`;
 
 type TileNode = {
   q: number;
   r: number;
-  type: TileType;
-  polygon: Phaser.GameObjects.Polygon;
+  graphics: Phaser.GameObjects.Graphics;
   centerX: number;
   centerY: number;
   vertices: Array<{ x: number; y: number }>;
@@ -31,7 +30,6 @@ type UnitSprite = {
   state: UnitState;
   root: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Arc;
-  hpLabel: Phaser.GameObjects.Text;
 };
 
 export type BattleDebugState = {
@@ -70,27 +68,10 @@ function compactUnitName(name: string): string {
   return name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "UNIT";
 }
 
-const TILE_COLORS: Record<TileType, number> = {
-  plain: 0x31445a,
-  cover: 0x2d5f4a,
-  elevation: 0x5a4f38,
-  energy: 0x305f7f,
-  trap: 0x6b3544
-};
-
-const TILE_LABELS: Array<{ type: TileType; label: string }> = [
-  { type: "plain", label: "Plain" },
-  { type: "cover", label: "Cover" },
-  { type: "elevation", label: "Elevation" },
-  { type: "energy", label: "Energy" },
-  { type: "trap", label: "Trap" }
-];
-
 function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
   const points: Phaser.Types.Math.Vector2Like[] = [];
-  for (let i = 0; i < 6; i += 1) {
-    // Pointy-top hex orientation to match axial->world conversion below.
-    const angle = Phaser.Math.DegToRad(60 * i - 90);
+  for (let index = 0; index < 6; index += 1) {
+    const angle = Phaser.Math.DegToRad(60 * index - 90);
     points.push({
       x: size * Math.cos(angle),
       y: size * Math.sin(angle)
@@ -99,41 +80,16 @@ function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
   return points;
 }
 
-function axialToWorld(q: number, r: number): { x: number; y: number } {
-  const x = Math.round(ORIGIN_X + HEX_SIZE * Math.sqrt(3) * (q + r / 2));
-  const y = Math.round(ORIGIN_Y + HEX_SIZE * 1.5 * r);
-  return { x, y };
-}
-
-function pickTileType(q: number, r: number): TileType {
-  const roll = (q * 11 + r * 7 + q * r * 3) % 9;
-  if (roll === 0) {
-    return "trap";
-  }
-  if (roll <= 2) {
-    return "energy";
-  }
-  if (roll <= 4) {
-    return "cover";
-  }
-  if (roll <= 6) {
-    return "elevation";
-  }
-  return "plain";
-}
-
 export class WarProtocolScene extends Phaser.Scene {
   private readonly tiles = new Map<CoordKey, TileNode>();
   private readonly units = new Map<string, UnitSprite>();
   private readonly reserveUnits = new Map<string, UnitTemplate>();
   private readonly occupiedTiles = new Map<CoordKey, string>();
-  private readonly actedThisTurn = new Set<string>();
 
-  private selectedUnitId: string | null = null;
+  private readonly pointCache = hexPoints(HEX_SIZE);
+
   private selectedReserveUnitId: string | null = null;
   private statusText!: Phaser.GameObjects.Text;
-  private currentTeam: "Blue" | "Red" = "Blue";
-  private turnNumber = 1;
 
   constructor() {
     super("war-protocol-scene");
@@ -143,33 +99,27 @@ export class WarProtocolScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#0d1219");
     this.cameras.main.roundPixels = true;
 
+    this.reserveUnits.clear();
     for (const unit of DEMO_UNITS) {
       this.reserveUnits.set(unit.id, unit);
     }
 
-    this.drawHexBoard();
-    this.drawLegend();
-    this.drawStatusLine();
-    this.refreshHighlights();
-    this.emitTurnState();
-    this.emitRosterState();
-  }
+    this.createStatusText();
+    this.ensureSingleTile();
+    this.layoutScene();
+    this.statusText.setText("Drag the unit into the hex.");
+    this.scale.on("resize", this.handleResize, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off("resize", this.handleResize, this);
+    });
 
-  public endTurn(): void {
-    this.selectedUnitId = null;
-    this.selectedReserveUnitId = null;
-    this.actedThisTurn.clear();
-    this.currentTeam = this.currentTeam === "Blue" ? "Red" : "Blue";
-    this.turnNumber += 1;
-    this.statusText.setText(`Turn ${this.turnNumber} started. Active team: ${this.currentTeam}.`);
-    this.emitTurnState();
     this.emitRosterState();
     this.refreshHighlights();
   }
 
   public selectReserveUnit(unitId: string): void {
     if (this.units.has(unitId)) {
-      this.statusText.setText("This unit is already deployed.");
+      this.statusText.setText("The unit is already deployed.");
       return;
     }
 
@@ -178,9 +128,8 @@ export class WarProtocolScene extends Phaser.Scene {
       return;
     }
 
-    this.selectedUnitId = null;
     this.selectedReserveUnitId = unitId;
-    this.statusText.setText(`Deploy ${unit.name}: click any empty hex.`);
+    this.statusText.setText(`Place ${unit.name} into the hex.`);
     this.emitRosterState();
     this.refreshHighlights();
   }
@@ -189,22 +138,24 @@ export class WarProtocolScene extends Phaser.Scene {
     if (!this.reserveUnits.has(unitId) || this.units.has(unitId)) {
       return;
     }
-    const snappedTile = this.findTileAtPoint(worldX, worldY);
-    if (!snappedTile) {
-      this.statusText.setText("Drop target is outside battlefield.");
+
+    const tile = this.findTileAtPoint(worldX, worldY);
+    if (!tile) {
+      this.statusText.setText("Drop target is outside the hex.");
       return;
     }
 
-    const destinationKey = this.tileKey(snappedTile.q, snappedTile.r);
-    if (this.occupiedTiles.has(destinationKey)) {
-      this.statusText.setText("Target hex is occupied.");
+    const tileKey = this.tileKey(tile.q, tile.r);
+    if (this.occupiedTiles.has(tileKey)) {
+      this.statusText.setText("The hex is already occupied.");
       return;
     }
 
-    this.placeReserveUnit(unitId, snappedTile.q, snappedTile.r);
+    this.placeReserveUnit(unitId, tile.q, tile.r);
   }
 
   public getDebugState(): BattleDebugState {
+    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
     const units = Array.from(this.units.values())
       .map((unit) => {
         const tileCenter = this.getTileCenter(unit.state.q, unit.state.r);
@@ -222,174 +173,131 @@ export class WarProtocolScene extends Phaser.Scene {
       })
       .sort((left, right) => left.id.localeCompare(right.id));
 
-    const tiles = Array.from(this.tiles.values())
-      .map((tile) => ({
-        q: tile.q,
-        r: tile.r,
-        centerX: tile.centerX,
-        centerY: tile.centerY,
-        vertices: tile.vertices
-      }))
-      .sort((left, right) => left.r - right.r || left.q - right.q);
-
     return {
       board: {
-        cols: COLS,
-        rows: ROWS,
+        cols: 1,
+        rows: 1,
         hexSize: HEX_SIZE,
-        originX: ORIGIN_X,
-        originY: ORIGIN_Y
+        originX: tile?.centerX ?? this.scale.width / 2,
+        originY: tile?.centerY ?? this.scale.height / 2
       },
       statusText: this.statusText?.text ?? "",
-      tiles,
+      tiles: tile
+        ? [
+            {
+              q: tile.q,
+              r: tile.r,
+              centerX: tile.centerX,
+              centerY: tile.centerY,
+              vertices: tile.vertices
+            }
+          ]
+        : [],
       units
     };
   }
 
-  private findTileAtPoint(
-    worldX: number,
-    worldY: number
-  ): { q: number; r: number } | null {
-    let bestTile: { q: number; r: number } | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-
-    for (const [, tile] of this.tiles) {
-      if (!this.isPointInsidePolygon(worldX, worldY, tile.vertices)) {
-        continue;
-      }
-
-      const dx = worldX - tile.centerX;
-      const dy = worldY - tile.centerY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestTile = { q: tile.q, r: tile.r };
-      }
-    }
-
-    return bestTile;
+  private handleResize(): void {
+    this.layoutScene();
+    this.refreshHighlights();
   }
 
-  private isPointInsidePolygon(
-    x: number,
-    y: number,
-    vertices: Array<{ x: number; y: number }>
-  ): boolean {
-    let inside = false;
-    let j = vertices.length - 1;
-
-    for (let i = 0; i < vertices.length; i += 1) {
-      const xi = vertices[i].x;
-      const yi = vertices[i].y;
-      const xj = vertices[j].x;
-      const yj = vertices[j].y;
-
-      const intersects =
-        yi > y !== yj > y &&
-        x < ((xj - xi) * (y - yi)) / ((yj - yi) + Number.EPSILON) + xi;
-      if (intersects) {
-        inside = !inside;
-      }
-      j = i;
-    }
-
-    return inside;
+  private createStatusText(): void {
+    this.statusText = this.add
+      .text(0, 0, "", {
+        fontFamily: "monospace",
+        fontSize: "13px",
+        color: "#e7f0fb"
+      })
+      .setOrigin(0, 0.5);
   }
 
-  private drawHexBoard(): void {
-    const points = hexPoints(HEX_SIZE);
+  private ensureSingleTile(): void {
+    const key = this.tileKey(TILE_Q, TILE_R);
+    if (this.tiles.has(key)) {
+      return;
+    }
 
-    for (let r = 0; r < ROWS; r += 1) {
-      for (let q = 0; q < COLS; q += 1) {
-        const { x, y } = axialToWorld(q, r);
-        const tileType = pickTileType(q, r);
-        const fillColor = TILE_COLORS[tileType];
+    const graphics = this.add.graphics();
+    graphics.setDepth(1);
 
-        const tile = this.add.polygon(x, y, points, fillColor, 0.85);
-        tile.setStrokeStyle(2, 0x1b2a38, 0.85);
-        tile.setInteractive({ useHandCursor: true });
-        tile.on("pointerdown", () => this.onTileClicked(q, r));
-        const bounds = tile.getBounds();
-        const centerX = bounds.centerX;
-        const centerY = bounds.centerY;
-        const vertices = points.map((point) => ({
-          x: centerX + point.x,
-          y: centerY + point.y
-        }));
+    this.tiles.set(key, {
+      q: TILE_Q,
+      r: TILE_R,
+      graphics,
+      centerX: 0,
+      centerY: 0,
+      vertices: []
+    });
+  }
 
-        this.tiles.set(this.tileKey(q, r), {
-          q,
-          r,
-          type: tileType,
-          polygon: tile,
-          centerX,
-          centerY,
-          vertices
-        });
+  private layoutScene(): void {
+    const requestedCenterX = Math.round(this.scale.width / 2);
+    const requestedCenterY = Math.round(this.scale.height * 0.42);
+    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
 
-        if ((q + r) % 4 === 0) {
-          this.add
-            .text(centerX, centerY, tileType[0].toUpperCase(), {
-              fontFamily: "monospace",
-              fontSize: "11px",
-              color: "#d7e4f4"
-            })
-            .setOrigin(0.5)
-            .setAlpha(0.7);
-        }
-      }
+    if (tile) {
+      tile.centerX = requestedCenterX;
+      tile.centerY = requestedCenterY;
+      tile.vertices = this.pointCache.map((point) => ({
+        x: tile.centerX + point.x,
+        y: tile.centerY + point.y
+      }));
+    }
+
+    this.statusText.setPosition(36, this.scale.height - 28);
+
+    for (const [, unit] of this.units) {
+      const position = this.getTileCenter(unit.state.q, unit.state.r);
+      unit.root.setPosition(position.x, position.y);
     }
   }
 
   private getTileCenter(q: number, r: number): { x: number; y: number } {
     const tile = this.tiles.get(this.tileKey(q, r));
-    if (tile) {
-      return { x: tile.centerX, y: tile.centerY };
+    if (!tile) {
+      return {
+        x: Math.round(this.scale.width / 2),
+        y: Math.round(this.scale.height * 0.42)
+      };
     }
-    return axialToWorld(q, r);
+    return { x: tile.centerX, y: tile.centerY };
   }
 
   private createUnitSprite(state: UnitState): UnitSprite {
     const { x, y } = this.getTileCenter(state.q, state.r);
 
-    const body = this.add.circle(0, 0, 19, state.color, 0.96);
-    body.setStrokeStyle(2, 0xe6edf6, 0.9);
+    const body = this.add.circle(0, 0, 28, state.color, 0.96);
+    body.setStrokeStyle(3, 0xe6edf6, 0.95);
 
-    const shortName = compactUnitName(state.name);
     const nameLabel = this.add
-      .text(0, -11, shortName, {
+      .text(0, -11, compactUnitName(state.name), {
         fontFamily: "monospace",
-        fontSize: "8px",
+        fontSize: "10px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
 
     const roleLabel = this.add
-      .text(0, 0, state.role[0], {
+      .text(0, 1, state.role[0], {
         fontFamily: "monospace",
-        fontSize: "12px",
+        fontSize: "16px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 11, `${state.hp}`, {
+      .text(0, 14, `${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "8px",
-        color: "#c8d7e8"
+        fontSize: "10px",
+        color: "#e7f0fb"
       })
       .setOrigin(0.5);
 
     const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
-    root.setSize(40, 40);
-    root.setInteractive(new Phaser.Geom.Circle(0, 0, 18), Phaser.Geom.Circle.Contains);
-    root.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      pointer.event.stopPropagation();
-      this.onUnitSelected(state.id);
-    });
     root.setDepth(10);
 
-    return { state, root, body, hpLabel };
+    return { state, root, body };
   }
 
   private placeReserveUnit(unitId: string, q: number, r: number): void {
@@ -405,211 +313,36 @@ export class WarProtocolScene extends Phaser.Scene {
     this.occupiedTiles.set(this.tileKey(q, r), unitId);
     this.selectedReserveUnitId = null;
 
-    this.statusText.setText(`${state.name} deployed at (${q}, ${r}).`);
-    this.emitTurnState();
+    this.statusText.setText(`${state.name} deployed into the hex.`);
     this.emitRosterState();
-    this.refreshHighlights();
-  }
-
-  private drawLegend(): void {
-    const panel = this.add.rectangle(760, 120, 180, 170, 0x101a24, 0.88);
-    panel.setStrokeStyle(1, 0x31465c, 0.95);
-
-    this.add
-      .text(760, 52, "Tile Types", {
-        fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#e7f0fb"
-      })
-      .setOrigin(0.5);
-
-    TILE_LABELS.forEach((item, index) => {
-      const y = 78 + index * 24;
-      this.add.rectangle(700, y, 14, 14, TILE_COLORS[item.type], 0.95).setStrokeStyle(1, 0xe8f0fb, 0.7);
-      this.add
-        .text(715, y - 6, item.label, {
-          fontFamily: "monospace",
-          fontSize: "12px",
-          color: "#d3dfec"
-        })
-        .setOrigin(0, 0);
-    });
-  }
-
-  private drawStatusLine(): void {
-    this.statusText = this.add
-      .text(36, 585, "Deploy units from the roster, then move them on your turn.", {
-        fontFamily: "monospace",
-        fontSize: "13px",
-        color: "#e7f0fb"
-      })
-      .setOrigin(0, 0.5);
-  }
-
-  private onUnitSelected(unitId: string): void {
-    const unit = this.units.get(unitId);
-    if (!unit) {
-      return;
-    }
-
-    this.selectedReserveUnitId = null;
-    this.selectedUnitId = unitId;
-
-    if (unit.state.team !== this.currentTeam) {
-      this.statusText.setText(`It is ${this.currentTeam} team turn.`);
-      this.selectedUnitId = null;
-      this.refreshHighlights();
-      return;
-    }
-    if (this.actedThisTurn.has(unitId)) {
-      this.statusText.setText(`${unit.state.name} already acted this turn.`);
-      this.selectedUnitId = null;
-      this.refreshHighlights();
-      return;
-    }
-
-    this.statusText.setText(`Turn ${this.turnNumber} (${this.currentTeam}): ${unit.state.name} selected.`);
-    this.emitRosterState();
-    this.refreshHighlights();
-  }
-
-  private onTileClicked(q: number, r: number): void {
-    const destinationKey = this.tileKey(q, r);
-
-    if (this.selectedReserveUnitId) {
-      if (this.occupiedTiles.has(destinationKey)) {
-        this.statusText.setText("Target hex is occupied.");
-        return;
-      }
-      this.placeReserveUnit(this.selectedReserveUnitId, q, r);
-      return;
-    }
-
-    if (!this.selectedUnitId) {
-      this.statusText.setText("Select a unit first.");
-      return;
-    }
-
-    const unit = this.units.get(this.selectedUnitId);
-    if (!unit) {
-      return;
-    }
-
-    const occupiedBy = this.occupiedTiles.get(destinationKey);
-    if (occupiedBy && occupiedBy !== unit.state.id) {
-      this.statusText.setText("Target hex is occupied.");
-      return;
-    }
-
-    const distance = this.hexDistance(unit.state.q, unit.state.r, q, r);
-    if (distance === 0) {
-      this.statusText.setText("Unit is already on this hex.");
-      return;
-    }
-    if (distance > unit.state.move) {
-      this.statusText.setText(`Out of range. ${unit.state.name} can move up to ${unit.state.move} hexes.`);
-      return;
-    }
-
-    const fromKey = this.tileKey(unit.state.q, unit.state.r);
-    this.occupiedTiles.delete(fromKey);
-    this.occupiedTiles.set(destinationKey, unit.state.id);
-
-    unit.state.q = q;
-    unit.state.r = r;
-    const { x, y } = this.getTileCenter(q, r);
-
-    this.tweens.add({
-      targets: unit.root,
-      x,
-      y,
-      duration: 180,
-      ease: "Sine.Out"
-    });
-
-    this.actedThisTurn.add(unit.state.id);
-    this.selectedUnitId = null;
-    this.statusText.setText(`${unit.state.name} moved to (${q}, ${r}) and ended action.`);
-    this.emitTurnState();
-    this.autoEndTurnIfNeeded();
     this.refreshHighlights();
   }
 
   private refreshHighlights(): void {
-    const selected = this.selectedUnitId ? this.units.get(this.selectedUnitId) : null;
-
-    for (const [, tile] of this.tiles) {
-      const baseColor = TILE_COLORS[tile.type];
-      const key = this.tileKey(tile.q, tile.r);
-      tile.polygon.setFillStyle(baseColor, 0.85);
-      tile.polygon.setStrokeStyle(2, 0x1b2a38, 0.85);
-
-      if (this.selectedReserveUnitId && !this.occupiedTiles.has(key)) {
-        tile.polygon.setFillStyle(baseColor, 1);
-        tile.polygon.setStrokeStyle(3, 0x9be7b0, 0.95);
-        continue;
-      }
-
-      if (!selected) {
-        continue;
-      }
-
-      const isOccupied = this.occupiedTiles.has(key);
-      const distance = this.hexDistance(selected.state.q, selected.state.r, tile.q, tile.r);
-      const inRange = distance > 0 && distance <= selected.state.move;
-
-      if (inRange && !isOccupied) {
-        tile.polygon.setFillStyle(baseColor, 1);
-        tile.polygon.setStrokeStyle(3, 0xf4ce74, 0.95);
-      }
+    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
+    if (tile) {
+      const isAvailable = this.selectedReserveUnitId && !this.occupiedTiles.has(this.tileKey(TILE_Q, TILE_R));
+      this.redrawTile(tile, Boolean(isAvailable));
     }
 
     for (const [, unit] of this.units) {
-      const isCurrentTeam = unit.state.team === this.currentTeam;
-      const hasActed = this.actedThisTurn.has(unit.state.id);
-
-      if (this.selectedUnitId === unit.state.id) {
-        unit.body.setStrokeStyle(3, 0xfff1a6, 1);
-        unit.root.setDepth(15);
-      } else {
-        unit.body.setStrokeStyle(2, 0xe6edf6, 0.9);
-        unit.root.setDepth(10);
-      }
-      unit.root.setAlpha(isCurrentTeam ? (hasActed ? 0.55 : 1) : 0.8);
-      unit.hpLabel.setText(`${unit.state.hp}`);
+      unit.body.setStrokeStyle(3, 0xe6edf6, 0.95);
+      unit.root.setAlpha(1);
     }
   }
 
-  private autoEndTurnIfNeeded(): void {
-    const available = this.getRemainingActions();
-    if (available > 0) {
-      return;
+  private redrawTile(tile: TileNode, isHighlighted: boolean): void {
+    tile.graphics.clear();
+    tile.graphics.fillStyle(TILE_FILL, 0.9);
+    tile.graphics.lineStyle(3, isHighlighted ? HIGHLIGHT_STROKE : TILE_STROKE, isHighlighted ? 1 : 0.95);
+    tile.graphics.beginPath();
+    tile.graphics.moveTo(tile.vertices[0].x, tile.vertices[0].y);
+    for (let index = 1; index < tile.vertices.length; index += 1) {
+      tile.graphics.lineTo(tile.vertices[index].x, tile.vertices[index].y);
     }
-
-    const hasAnyUnitsForTeam = Array.from(this.units.values()).some(
-      (unit) => unit.state.team === this.currentTeam
-    );
-    if (hasAnyUnitsForTeam) {
-      this.endTurn();
-    }
-  }
-
-  private getRemainingActions(): number {
-    let count = 0;
-    for (const [, unit] of this.units) {
-      if (unit.state.team === this.currentTeam && !this.actedThisTurn.has(unit.state.id)) {
-        count += 1;
-      }
-    }
-    return count;
-  }
-
-  private emitTurnState(): void {
-    this.events.emit("turnStateChanged", {
-      currentTeam: this.currentTeam,
-      turnNumber: this.turnNumber,
-      remainingActions: this.getRemainingActions()
-    });
+    tile.graphics.closePath();
+    tile.graphics.fillPath();
+    tile.graphics.strokePath();
   }
 
   private emitRosterState(): void {
@@ -619,14 +352,46 @@ export class WarProtocolScene extends Phaser.Scene {
     });
   }
 
-  private tileKey(q: number, r: number): CoordKey {
-    return `${q},${r}`;
+  private findTileAtPoint(worldX: number, worldY: number): { q: number; r: number } | null {
+    const tile = this.tiles.get(this.tileKey(TILE_Q, TILE_R));
+    if (!tile) {
+      return null;
+    }
+
+    return this.isPointInsidePolygon(worldX, worldY, tile.vertices)
+      ? { q: tile.q, r: tile.r }
+      : null;
   }
 
-  private hexDistance(aq: number, ar: number, bq: number, br: number): number {
-    const dq = aq - bq;
-    const dr = ar - br;
-    const ds = (aq + ar) - (bq + br);
-    return (Math.abs(dq) + Math.abs(dr) + Math.abs(ds)) / 2;
+  private isPointInsidePolygon(
+    x: number,
+    y: number,
+    vertices: Array<{ x: number; y: number }>
+  ): boolean {
+    let inside = false;
+    let previousIndex = vertices.length - 1;
+
+    for (let currentIndex = 0; currentIndex < vertices.length; currentIndex += 1) {
+      const current = vertices[currentIndex];
+      const previous = vertices[previousIndex];
+      const intersects =
+        current.y > y !== previous.y > y &&
+        x <
+          ((previous.x - current.x) * (y - current.y)) /
+            ((previous.y - current.y) + Number.EPSILON) +
+            current.x;
+
+      if (intersects) {
+        inside = !inside;
+      }
+
+      previousIndex = currentIndex;
+    }
+
+    return inside;
+  }
+
+  private tileKey(q: number, r: number): CoordKey {
+    return `${q},${r}`;
   }
 }

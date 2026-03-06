@@ -37,13 +37,9 @@ declare global {
 }
 
 const screenshotDir = path.resolve(process.cwd(), "artifacts/ui/screenshots");
-const EDGE_PLACEMENTS = [
-  { unitId: "u-vanguard", q: 7, r: 4 },
-  { unitId: "u-bastion", q: 6, r: 6 },
-  { unitId: "u-ranger", q: 5, r: 6 },
-  { unitId: "u-arcanist", q: 7, r: 6 },
-  { unitId: "u-medic", q: 7, r: 5 }
-] as const;
+const UNIT_ID = "u-vanguard";
+
+test.describe.configure({ timeout: 180_000 });
 
 type RgbColor = {
   r: number;
@@ -65,20 +61,23 @@ function pointInsidePolygon(
   vertices: Array<{ x: number; y: number }>
 ): boolean {
   let inside = false;
-  let j = vertices.length - 1;
+  let previousIndex = vertices.length - 1;
 
-  for (let i = 0; i < vertices.length; i += 1) {
-    const xi = vertices[i].x;
-    const yi = vertices[i].y;
-    const xj = vertices[j].x;
-    const yj = vertices[j].y;
+  for (let currentIndex = 0; currentIndex < vertices.length; currentIndex += 1) {
+    const current = vertices[currentIndex];
+    const previous = vertices[previousIndex];
     const intersects =
-      yi > y !== yj > y &&
-      x < ((xj - xi) * (y - yi)) / ((yj - yi) + Number.EPSILON) + xi;
+      current.y > y !== previous.y > y &&
+      x <
+        ((previous.x - current.x) * (y - current.y)) /
+          ((previous.y - current.y) + Number.EPSILON) +
+          current.x;
+
     if (intersects) {
       inside = !inside;
     }
-    j = i;
+
+    previousIndex = currentIndex;
   }
 
   return inside;
@@ -104,7 +103,7 @@ function findUnitBlob(
   centroidY: number;
   pixels: Array<{ x: number; y: number }>;
 } {
-  const searchRadius = 28;
+  const searchRadius = 44;
   const pixels: Array<{ x: number; y: number }> = [];
   let weightedX = 0;
   let weightedY = 0;
@@ -138,7 +137,7 @@ function findUnitBlob(
     }
   }
 
-  expect(pixels.length).toBeGreaterThan(500);
+  expect(pixels.length).toBeGreaterThan(1200);
 
   return {
     centroidX: weightedX / pixels.length,
@@ -171,21 +170,6 @@ async function readDebugState(page: Page): Promise<BattleDebugState> {
   const state = await page.evaluate(() => window.__WAR_PROTOCOL_E2E__?.getBattleDebugState() ?? null);
   expect(state).not.toBeNull();
   return state as BattleDebugState;
-}
-
-async function dragCardToTile(
-  page: Page,
-  unitId: string,
-  q: number,
-  r: number
-): Promise<void> {
-  const state = await readDebugState(page);
-  const tile = state.tiles.find((candidate) => candidate.q === q && candidate.r === r);
-  expect(tile, `Missing tile (${q}, ${r})`).toBeTruthy();
-  const boardBox = await page.getByTestId("battle-board").boundingBox();
-  expect(boardBox).not.toBeNull();
-
-  await dispatchHtml5Drag(page, unitId, boardBox!.x + tile!.centerX, boardBox!.y + tile!.centerY);
 }
 
 async function dispatchHtml5Drag(
@@ -264,43 +248,41 @@ async function dispatchHtml5Drag(
 test.beforeEach(async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(page.getByTestId("battle-board")).toBeVisible();
-  await page.waitForFunction(() => {
-    const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
-    return Boolean(state && state.tiles.length > 0);
-  });
+  await page.waitForFunction(
+    () => {
+      const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
+      return Boolean(state && state.tiles.length === 1);
+    },
+    undefined,
+    { timeout: 120_000 }
+  );
 });
 
-test("keeps rendered unit blobs inside the target edge hexes", async ({
-  page
-}, testInfo) => {
-  test.setTimeout(120_000);
+test("deploys the only unit into the only valid hex", async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
 
-  for (const placement of EDGE_PLACEMENTS) {
-    await dragCardToTile(page, placement.unitId, placement.q, placement.r);
-  }
+  const initialState = await readDebugState(page);
+  const tile = initialState.tiles[0];
+  const boardBox = await page.getByTestId("battle-board").boundingBox();
+  expect(boardBox).not.toBeNull();
+
+  await dispatchHtml5Drag(page, UNIT_ID, boardBox!.x + tile.centerX, boardBox!.y + tile.centerY);
 
   await expect
     .poll(async () => {
       const state = await readDebugState(page);
-      return state.units.map((unit) => `${unit.id}:${unit.q},${unit.r}`).sort();
+      return state.units.map((unit) => `${unit.id}:${unit.q},${unit.r}`);
     })
-    .toEqual([
-      "u-arcanist:7,6",
-      "u-bastion:6,6",
-      "u-medic:7,5",
-      "u-ranger:5,6",
-      "u-vanguard:7,4"
-    ]);
+    .toEqual([`${UNIT_ID}:0,0`]);
 
   const state = await readDebugState(page);
-  for (const unit of state.units) {
-    expect(Math.abs(unit.rootX - unit.tileCenterX)).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(unit.rootY - unit.tileCenterY)).toBeLessThanOrEqual(0.5);
-  }
+  const unit = state.units[0];
+  expect(unit.rootX).toBeCloseTo(tile.centerX, 1);
+  expect(unit.rootY).toBeCloseTo(tile.centerY, 1);
+  expect(state.statusText).toBe("Vanguard deployed into the hex.");
 
-  const boardPath = path.join(screenshotDir, "drag-drop-board.png");
-  const pagePath = path.join(screenshotDir, "drag-drop-page.png");
+  const boardPath = path.join(screenshotDir, "single-hex-board.png");
+  const pagePath = path.join(screenshotDir, "single-hex-page.png");
   const { buffer: canvasImage, box: canvasBox } = await captureCanvas(page);
   fs.writeFileSync(boardPath, canvasImage);
   await page.screenshot({ path: pagePath, fullPage: true });
@@ -308,61 +290,45 @@ test("keeps rendered unit blobs inside the target edge hexes", async ({
   const png = PNG.sync.read(canvasImage);
   const scaleX = png.width / canvasBox.width;
   const scaleY = png.height / canvasBox.height;
+  const targetColor = colorNumberToRgb(unit.color);
+  const blob = findUnitBlob(
+    png,
+    {
+      x: unit.tileCenterX * scaleX,
+      y: unit.tileCenterY * scaleY
+    },
+    targetColor
+  );
 
-  for (const unit of state.units) {
-    const tile = state.tiles.find((candidate) => candidate.q === unit.q && candidate.r === unit.r);
-    expect(tile, `Missing tile for ${unit.id}`).toBeTruthy();
+  expect(Math.abs(blob.centroidX - unit.tileCenterX * scaleX)).toBeLessThanOrEqual(2);
+  expect(Math.abs(blob.centroidY - unit.tileCenterY * scaleY)).toBeLessThanOrEqual(2);
 
-    const blob = findUnitBlob(
-      png,
-      {
-        x: unit.tileCenterX * scaleX,
-        y: unit.tileCenterY * scaleY
-      },
-      colorNumberToRgb(unit.color)
-    );
-
-    expect(Math.abs(blob.centroidX - unit.tileCenterX * scaleX)).toBeLessThanOrEqual(3);
-    expect(Math.abs(blob.centroidY - unit.tileCenterY * scaleY)).toBeLessThanOrEqual(3);
-
-    const scaledVertices = tile!.vertices.map((vertex) => ({
-      x: vertex.x * scaleX,
-      y: vertex.y * scaleY
-    }));
-
-    const pixelsOutside = blob.pixels.filter(
-      (pixel) => !pointInsidePolygon(pixel.x, pixel.y, scaledVertices)
-    ).length;
-
-    expect(pixelsOutside / blob.pixels.length).toBeLessThanOrEqual(0.03);
-  }
-
-  await testInfo.attach("drag-drop-board", {
-    path: boardPath,
-    contentType: "image/png"
-  });
-  await testInfo.attach("drag-drop-page", {
-    path: pagePath,
-    contentType: "image/png"
-  });
+  const scaledVertices = tile.vertices.map((vertex) => ({
+    x: vertex.x * scaleX,
+    y: vertex.y * scaleY
+  }));
+  const insidePixels = blob.pixels.filter((pixel) =>
+    pointInsidePolygon(pixel.x, pixel.y, scaledVertices)
+  ).length;
+  expect(insidePixels / blob.pixels.length).toBeGreaterThan(0.98);
 });
 
-test("rejects drops outside the active hex grid", async ({ page }) => {
+test("rejects drops outside the hex", async ({ page }) => {
   const boardBox = await page.getByTestId("battle-board").boundingBox();
   expect(boardBox).not.toBeNull();
 
-  await dispatchHtml5Drag(page, "u-medic", boardBox!.x + 24, boardBox!.y + 574);
+  await dispatchHtml5Drag(page, UNIT_ID, boardBox!.x + 18, boardBox!.y + 18);
 
   await expect
     .poll(async () => {
       const state = await readDebugState(page);
       return {
-        deployedCount: state.units.length,
+        unitCount: state.units.length,
         statusText: state.statusText
       };
     })
     .toEqual({
-      deployedCount: 0,
-      statusText: "Drop target is outside battlefield."
+      unitCount: 0,
+      statusText: "Drop target is outside the hex."
     });
 });

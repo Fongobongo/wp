@@ -6,13 +6,7 @@ let game: Phaser.Game | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let sceneRef: WarProtocolScene | null = null;
 
-const BASE_HEIGHT = 620;
-
-type TurnState = {
-  currentTeam: "Blue" | "Red";
-  turnNumber: number;
-  remainingActions: number;
-};
+const BASE_HEIGHT = 460;
 
 type RosterState = {
   deployedUnitIds: string[];
@@ -128,10 +122,6 @@ export function unmountBattleGame(): void {
   sceneRef = null;
 }
 
-export function endCurrentTurn(): void {
-  sceneRef?.endTurn();
-}
-
 export function selectUnitForPlacement(unitId: string): void {
   sceneRef?.selectReserveUnit(unitId);
 }
@@ -158,10 +148,6 @@ export function deployUnitByClientPosition(
   const worldX = normalizedX * game.scale.width;
   const worldY = normalizedY * game.scale.height;
   sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
-}
-
-export function onTurnStateChange(listener: (state: TurnState) => void): () => void {
-  return subscribeToSceneEvent<TurnState>("turnStateChanged", listener);
 }
 
 export function onRosterStateChange(listener: (state: RosterState) => void): () => void {

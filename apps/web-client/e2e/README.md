@@ -3,10 +3,10 @@
 Headless browser smoke coverage for the web MVP lives here.
 
 Current scope:
-- drag-and-drop deployment from roster to battlefield;
-- rejection of drops outside the active hex grid;
-- screenshot capture after successful battlefield deployment;
-- pixel-based checks that rendered unit blobs stay inside their edge hex polygons.
+- drag-and-drop deployment from the reserve card into the single valid battlefield hex;
+- rejection of drops outside that hex;
+- screenshot capture after successful deployment;
+- pixel-based checks that the rendered unit blob stays centered inside the hex polygon.
 
 Artifacts are written to:
 - `artifacts/ui/screenshots`

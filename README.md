@@ -62,7 +62,11 @@ npm run dev:battle
 
 ## Headless UI smoke coverage
 
-The repository includes a Playwright smoke suite for drag-and-drop deployment on the battlefield, including pixel-based edge-cell checks that verify rendered unit blobs stay inside the target hexes.
+The repository includes a Playwright smoke suite for the current single-hex web MVP. It verifies:
+
+- drag-and-drop deployment of the reserve unit into the only valid hex;
+- rejection of drops outside that hex;
+- pixel-based checks that the rendered unit blob stays centered inside the hex polygon.
 
 Run from the repository root:
 
