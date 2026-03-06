@@ -85,6 +85,21 @@ function compactUnitName(name: string): string {
   return name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "UNIT";
 }
 
+function roleIconType(role: UnitTemplate["role"]): "sword" | "shield" | "bow" | "wand" | "cross" {
+  switch (role) {
+    case "Defender":
+      return "shield";
+    case "Ranger":
+      return "bow";
+    case "Mage":
+      return "wand";
+    case "Healer":
+      return "cross";
+    default:
+      return "sword";
+  }
+}
+
 function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
   const points: Phaser.Types.Math.Vector2Like[] = [];
   for (let index = 0; index < 6; index += 1) {
@@ -339,6 +354,110 @@ export class WarProtocolScene extends Phaser.Scene {
     return { x: tile.centerX, y: tile.centerY };
   }
 
+  private createChipBackground(width: number, height: number): Phaser.GameObjects.Graphics {
+    const background = this.add.graphics();
+    background.setPosition(-width / 2, -height / 2);
+    background.fillStyle(0x0f1823, 0.96);
+    background.lineStyle(1.5, 0x45596d, 1);
+    background.fillRoundedRect(0, 0, width, height, 6);
+    background.strokeRoundedRect(0, 0, width, height, 6);
+    return background;
+  }
+
+  private createRoleIcon(role: UnitTemplate["role"]): Phaser.GameObjects.Graphics {
+    const icon = this.add.graphics();
+    icon.lineStyle(2, 0xe7f0fb, 1);
+
+    switch (roleIconType(role)) {
+      case "shield":
+        icon.beginPath();
+        icon.moveTo(0, -7);
+        icon.lineTo(6, -4);
+        icon.lineTo(5, 3);
+        icon.lineTo(0, 8);
+        icon.lineTo(-5, 3);
+        icon.lineTo(-6, -4);
+        icon.closePath();
+        icon.strokePath();
+        break;
+      case "bow":
+        icon.beginPath();
+        icon.arc(-1, 0, 7, Phaser.Math.DegToRad(260), Phaser.Math.DegToRad(100), true);
+        icon.strokePath();
+        icon.beginPath();
+        icon.moveTo(4, -7);
+        icon.lineTo(4, 7);
+        icon.moveTo(1, -5);
+        icon.lineTo(7, -9);
+        icon.moveTo(1, 5);
+        icon.lineTo(7, 9);
+        icon.strokePath();
+        break;
+      case "wand":
+        icon.beginPath();
+        icon.moveTo(-5, 6);
+        icon.lineTo(3, -2);
+        icon.strokePath();
+        icon.fillStyle(0xe7f0fb, 1);
+        icon.fillCircle(5, -4, 2);
+        icon.lineStyle(1.5, 0xe7f0fb, 1);
+        icon.beginPath();
+        icon.moveTo(5, -10);
+        icon.lineTo(5, -6);
+        icon.moveTo(1, -4);
+        icon.lineTo(9, -4);
+        icon.moveTo(2, -8);
+        icon.lineTo(8, 0);
+        icon.moveTo(2, 0);
+        icon.lineTo(8, -8);
+        icon.strokePath();
+        break;
+      case "cross":
+        icon.beginPath();
+        icon.moveTo(0, -7);
+        icon.lineTo(0, 7);
+        icon.moveTo(-7, 0);
+        icon.lineTo(7, 0);
+        icon.strokePath();
+        break;
+      case "sword":
+      default:
+        icon.beginPath();
+        icon.moveTo(-2, 7);
+        icon.lineTo(4, 1);
+        icon.lineTo(7, -6);
+        icon.moveTo(-4, 5);
+        icon.lineTo(-1, 8);
+        icon.moveTo(-1, 8);
+        icon.lineTo(1, 10);
+        icon.moveTo(-1, 5);
+        icon.lineTo(2, 8);
+        icon.strokePath();
+        break;
+    }
+
+    return icon;
+  }
+
+  private createInfoChip(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    text: string
+  ): Phaser.GameObjects.Container {
+    const background = this.createChipBackground(width, height);
+    const label = this.add
+      .text(0, 0, text, {
+        fontFamily: "monospace",
+        fontSize: "8px",
+        color: "#eef5ff"
+      })
+      .setOrigin(0.5);
+
+    return this.add.container(x, y, [background, label]);
+  }
+
   private createUnitSprite(state: UnitState): UnitSprite {
     const { x, y } = this.getTileCenter(state.q, state.r);
 
@@ -353,23 +472,37 @@ export class WarProtocolScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const roleLabel = this.add
-      .text(0, 1, state.role[0], {
+    const centerLabel = this.add
+      .text(0, 0, state.team[0], {
         fontFamily: "monospace",
         fontSize: "14px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
-    const hpLabel = this.add
-      .text(0, 13, `${state.hp}`, {
+    const moveLabel = this.add
+      .text(0, 11, `MV ${state.move}`, {
         fontFamily: "monospace",
-        fontSize: "9px",
+        fontSize: "8px",
         color: "#e7f0fb"
       })
       .setOrigin(0.5);
 
-    const root = this.add.container(x, y, [body, nameLabel, roleLabel, hpLabel]);
+    const roleChipBackground = this.createChipBackground(18, 18);
+    const roleChipIcon = this.createRoleIcon(state.role);
+    const roleChip = this.add.container(-35, -10, [roleChipBackground, roleChipIcon]);
+    const attackChip = this.createInfoChip(-23, 15, 34, 16, `AT ${state.attack}`);
+    const healthChip = this.createInfoChip(23, 15, 34, 16, `HP ${state.hp}`);
+
+    const root = this.add.container(x, y, [
+      body,
+      nameLabel,
+      centerLabel,
+      moveLabel,
+      roleChip,
+      attackChip,
+      healthChip
+    ]);
     root.setDepth(10);
 
     return { state, root, body };
