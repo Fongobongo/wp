@@ -54,9 +54,26 @@ Services and web app:
 npm run lint
 npm run test
 npm run build
+npm run test:ui
 npm run dev:web
 npm run dev:battle
 ```
+
+## Headless UI smoke coverage
+
+The repository includes a Playwright smoke suite for drag-and-drop deployment on the battlefield.
+
+Run from the repository root:
+
+```bash
+npm run test:ui
+```
+
+Artifacts are written to:
+
+- `artifacts/ui/screenshots`
+- `artifacts/ui/playwright-report`
+- `artifacts/ui/test-results`
 
 ## Docker compose
 

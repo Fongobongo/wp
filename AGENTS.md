@@ -29,6 +29,11 @@ Before changing code or content, always align with:
 2. After redeploy, verify `https://play.hadoop21.click/` and `https://play.hadoop21.click/healthz` from the server.
 3. Report deployment verification results in the user response.
 
+## UI Verification Rule
+1. After each frontend or interaction change, run `npm run test:ui`.
+2. Review the generated screenshots in `artifacts/ui/screenshots`.
+3. Treat a frontend change as incomplete if drag-and-drop smoke coverage or screenshot generation fails.
+
 ## Non-Negotiable Product Rules
 1. Gameplay first: blockchain must not reduce gameplay quality.
 2. No pay-to-win: paid content must not grant combat power.

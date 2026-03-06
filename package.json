@@ -11,6 +11,8 @@
   "scripts": {
     "build": "npm run -ws build",
     "test": "npm run -ws test",
+    "test:ui": "playwright test",
+    "test:ui:headed": "playwright test --headed",
     "lint": "npm run -ws lint",
     "dev:web": "npm --workspace @warprotocol/web-client run dev",
     "dev:game-data": "npm --workspace @warprotocol/game-data-service run dev",
@@ -21,6 +23,7 @@
     "dev:all": "concurrently -n game-data,player,matchmaking,battle,economy,web -c blue,green,yellow,magenta,cyan,white \"npm run dev:game-data\" \"npm run dev:player\" \"npm run dev:matchmaking\" \"npm run dev:battle\" \"npm run dev:economy\" \"npm run dev:web\""
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^24.4.0",
     "concurrently": "^9.2.1",
     "tsx": "^4.20.5",

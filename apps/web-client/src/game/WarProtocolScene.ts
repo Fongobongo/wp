@@ -34,6 +34,33 @@ type UnitSprite = {
   hpLabel: Phaser.GameObjects.Text;
 };
 
+export type BattleDebugState = {
+  board: {
+    cols: number;
+    rows: number;
+    hexSize: number;
+    originX: number;
+    originY: number;
+  };
+  statusText: string;
+  tiles: Array<{
+    q: number;
+    r: number;
+    centerX: number;
+    centerY: number;
+  }>;
+  units: Array<{
+    id: string;
+    name: string;
+    q: number;
+    r: number;
+    rootX: number;
+    rootY: number;
+    tileCenterX: number;
+    tileCenterY: number;
+  }>;
+};
+
 function compactUnitName(name: string): string {
   return name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "UNIT";
 }
@@ -170,6 +197,46 @@ export class WarProtocolScene extends Phaser.Scene {
     }
 
     this.placeReserveUnit(unitId, snappedTile.q, snappedTile.r);
+  }
+
+  public getDebugState(): BattleDebugState {
+    const units = Array.from(this.units.values())
+      .map((unit) => {
+        const tileCenter = this.getTileCenter(unit.state.q, unit.state.r);
+        return {
+          id: unit.state.id,
+          name: unit.state.name,
+          q: unit.state.q,
+          r: unit.state.r,
+          rootX: unit.root.x,
+          rootY: unit.root.y,
+          tileCenterX: tileCenter.x,
+          tileCenterY: tileCenter.y
+        };
+      })
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    const tiles = Array.from(this.tiles.values())
+      .map((tile) => ({
+        q: tile.q,
+        r: tile.r,
+        centerX: tile.centerX,
+        centerY: tile.centerY
+      }))
+      .sort((left, right) => left.r - right.r || left.q - right.q);
+
+    return {
+      board: {
+        cols: COLS,
+        rows: ROWS,
+        hexSize: HEX_SIZE,
+        originX: ORIGIN_X,
+        originY: ORIGIN_Y
+      },
+      statusText: this.statusText?.text ?? "",
+      tiles,
+      units
+    };
   }
 
   private findTileAtPoint(

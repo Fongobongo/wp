@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { WarProtocolScene } from "./WarProtocolScene.js";
+import type { BattleDebugState } from "./WarProtocolScene.js";
 
 let game: Phaser.Game | null = null;
 let resizeObserver: ResizeObserver | null = null;
@@ -17,6 +18,14 @@ type RosterState = {
   deployedUnitIds: string[];
   selectedReserveUnitId: string | null;
 };
+
+declare global {
+  interface Window {
+    __WAR_PROTOCOL_E2E__?: {
+      getBattleDebugState: () => BattleDebugState | null;
+    };
+  }
+}
 
 function resizeGameToContainer(container: HTMLDivElement): void {
   if (!game) {
@@ -57,6 +66,16 @@ function subscribeToSceneEvent<TPayload>(
       attachedEmitter.off(eventName, handler);
     }
   };
+}
+
+function installE2EDebugBridge(): void {
+  window.__WAR_PROTOCOL_E2E__ = {
+    getBattleDebugState: () => sceneRef?.getDebugState() ?? null
+  };
+}
+
+if (typeof window !== "undefined") {
+  installE2EDebugBridge();
 }
 
 export function mountBattleGame(container: HTMLDivElement): void {

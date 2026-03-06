@@ -10,3 +10,6 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tsbuildinfo
 apps/web-client/.vite
+artifacts
+playwright-report
+test-results

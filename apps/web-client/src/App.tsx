@@ -88,6 +88,7 @@ export default function App() {
         </div>
         <div
           className={`battle-canvas${isDragOverBoard ? " is-drag-over" : ""}`}
+          data-testid="battle-board"
           ref={boardRef}
           onDragOver={(event) => {
             event.preventDefault();
@@ -118,6 +119,7 @@ export default function App() {
             return (
               <article
                 className={`unit-card${selectedForDeploy ? " is-selected" : ""}${deployed ? " is-deployed" : ""}`}
+                data-testid={`unit-card-${unit.id}`}
                 key={unit.id}
                 draggable={!deployed}
                 onDragStart={(event) => {
@@ -146,6 +148,7 @@ export default function App() {
                 <button
                   type="button"
                   className="deploy-button"
+                  data-testid={`deploy-button-${unit.id}`}
                   disabled={deployed}
                   onClick={() => selectUnitForPlacement(unit.id)}
                 >
