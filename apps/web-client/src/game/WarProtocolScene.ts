@@ -7,14 +7,13 @@ const GRID_ROWS = 2;
 const TILE_FILL = 0x31445a;
 const TILE_STROKE = 0x1b2a38;
 const HIGHLIGHT_STROKE = 0x9be7b0;
-const HORIZONTAL_SPACING = Math.round(Math.sqrt(3) * HEX_SIZE + 20);
-const VERTICAL_SPACING = Math.round(HEX_SIZE * 1.95);
+const HEX_HALF_WIDTH = Math.sqrt(3) * HEX_SIZE * 0.5;
 
 const TILE_LAYOUT = [
-  { q: 0, r: 0, col: 0, row: 0 },
-  { q: 1, r: 0, col: 1, row: 0 },
-  { q: 0, r: 1, col: 0, row: 1 },
-  { q: 1, r: 1, col: 1, row: 1 }
+  { q: 0, r: 0 },
+  { q: 1, r: 0 },
+  { q: 0, r: 1 },
+  { q: 1, r: 1 }
 ] as const;
 
 type CoordKey = `${number},${number}`;
@@ -22,8 +21,6 @@ type CoordKey = `${number},${number}`;
 type TileNode = {
   q: number;
   r: number;
-  col: number;
-  row: number;
   graphics: Phaser.GameObjects.Graphics;
   centerX: number;
   centerY: number;
@@ -89,6 +86,13 @@ function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
     });
   }
   return points;
+}
+
+function axialToWorld(q: number, r: number): { x: number; y: number } {
+  return {
+    x: HEX_SIZE * Math.sqrt(3) * (q + r / 2),
+    y: HEX_SIZE * 1.5 * r
+  };
 }
 
 export class WarProtocolScene extends Phaser.Scene {
@@ -237,8 +241,6 @@ export class WarProtocolScene extends Phaser.Scene {
       this.tiles.set(key, {
         q: tileDef.q,
         r: tileDef.r,
-        col: tileDef.col,
-        row: tileDef.row,
         graphics,
         centerX: 0,
         centerY: 0,
@@ -248,19 +250,33 @@ export class WarProtocolScene extends Phaser.Scene {
   }
 
   private layoutScene(): void {
-    const centerX = Math.round(this.scale.width / 2);
-    const centerY = Math.round(this.scale.height * 0.4);
-    const totalWidth = HORIZONTAL_SPACING * (GRID_COLS - 1);
-    const totalHeight = VERTICAL_SPACING * (GRID_ROWS - 1);
-    const startX = Math.round(centerX - totalWidth / 2);
-    const startY = Math.round(centerY - totalHeight / 2);
+    const viewportCenterX = Math.round(this.scale.width / 2);
+    const viewportCenterY = Math.round(this.scale.height * 0.42);
 
-    this.boardOriginX = startX;
-    this.boardOriginY = startY;
+    const relativeCenters = Array.from(this.tiles.values()).map((tile) => {
+      const world = axialToWorld(tile.q, tile.r);
+      return {
+        q: tile.q,
+        r: tile.r,
+        x: world.x,
+        y: world.y
+      };
+    });
+
+    const minX = Math.min(...relativeCenters.map((tile) => tile.x - HEX_HALF_WIDTH));
+    const maxX = Math.max(...relativeCenters.map((tile) => tile.x + HEX_HALF_WIDTH));
+    const minY = Math.min(...relativeCenters.map((tile) => tile.y - HEX_SIZE));
+    const maxY = Math.max(...relativeCenters.map((tile) => tile.y + HEX_SIZE));
+    const boardCenterX = (minX + maxX) / 2;
+    const boardCenterY = (minY + maxY) / 2;
+
+    this.boardOriginX = Math.round(viewportCenterX - boardCenterX);
+    this.boardOriginY = Math.round(viewportCenterY - boardCenterY);
 
     for (const [, tile] of this.tiles) {
-      tile.centerX = Math.round(startX + tile.col * HORIZONTAL_SPACING);
-      tile.centerY = Math.round(startY + tile.row * VERTICAL_SPACING);
+      const world = axialToWorld(tile.q, tile.r);
+      tile.centerX = Math.round(world.x + this.boardOriginX);
+      tile.centerY = Math.round(world.y + this.boardOriginY);
       tile.vertices = this.pointCache.map((point) => ({
         x: tile.centerX + point.x,
         y: tile.centerY + point.y
@@ -280,7 +296,7 @@ export class WarProtocolScene extends Phaser.Scene {
     if (!tile) {
       return {
         x: Math.round(this.scale.width / 2),
-        y: Math.round(this.scale.height * 0.4)
+        y: Math.round(this.scale.height * 0.42)
       };
     }
     return { x: tile.centerX, y: tile.centerY };
