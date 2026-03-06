@@ -22,7 +22,7 @@ http://{$DOMAIN} {
 
   # Protect operational/service routes with basic auth.
   @protected path /metrics* /services*
-  basicauth @protected {
+  basic_auth @protected {
     {$BASIC_AUTH_USER} {$BASIC_AUTH_PASSWORD_HASH}
   }
 

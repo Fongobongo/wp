@@ -1,0 +1,58 @@
+http://{$DOMAIN} {
+  encode gzip zstd
+
+  @security {
+    not path /.well-known/*
+  }
+  header @security {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  handle_path /healthz {
+    respond "ok" 200
+  }
+
+  handle_path /readyz {
+    reverse_proxy web-client:4173
+  }
+
+  @protected path /metrics* /services*
+  basic_auth @protected {
+    {$BASIC_AUTH_USER} {$BASIC_AUTH_PASSWORD_HASH}
+  }
+
+  handle_path /metrics {
+    respond "metrics disabled in web-only MVP" 200
+  }
+
+  handle_path /services/game-data/health {
+    respond "{\"service\":\"game-data-service\",\"status\":\"disabled\"}" 200
+  }
+
+  handle_path /services/player/health {
+    respond "{\"service\":\"player-service\",\"status\":\"disabled\"}" 200
+  }
+
+  handle_path /services/matchmaking/health {
+    respond "{\"service\":\"matchmaking-service\",\"status\":\"disabled\"}" 200
+  }
+
+  handle_path /services/battle/health {
+    respond "{\"service\":\"battle-service\",\"status\":\"disabled\"}" 200
+  }
+
+  handle_path /services/economy/health {
+    respond "{\"service\":\"economy-service\",\"status\":\"disabled\"}" 200
+  }
+
+  handle_path /services/* {
+    respond "service endpoints are disabled in the web-only MVP" 503
+  }
+
+  handle {
+    reverse_proxy web-client:4173
+  }
+}

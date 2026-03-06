@@ -20,7 +20,7 @@ jobs:
 
       - name: Check readiness endpoint
         env:
-          PROD_READINESS_URL: ${{ secrets.PROD_READINESS_URL != '' && secrets.PROD_READINESS_URL || 'https://play.hadoop21.click/readiness' }}
+          PROD_READINESS_URL: ${{ secrets.PROD_READINESS_URL != '' && secrets.PROD_READINESS_URL || 'https://play.hadoop21.click/readyz' }}
         run: |
           set -euo pipefail
           curl --fail --silent --show-error --location --max-time 15 \

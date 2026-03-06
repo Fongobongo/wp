@@ -96,10 +96,12 @@ docker compose up --build
 
 ## Production Domain Deployment (HTTPS)
 
-This repository includes a production stack for a permanent public domain:
-- `docker-compose.prod.yml`
+This repository includes production stacks for a permanent public domain:
+- `docker-compose.prod.yml` - full multi-service stack
+- `docker-compose.prod.web.yml` - current web-only MVP stack
 - `Dockerfile.web.prod`
-- `infra/prod/Caddyfile`
+- `infra/prod/Caddyfile` - full multi-service gateway
+- `infra/prod/Caddyfile.web` - current web-only gateway
 - `infra/prod/deploy_prod.sh`
 - `.github/workflows/deploy-prod.yml`
 - `.github/workflows/uptime-check.yml`
@@ -147,6 +149,8 @@ BASIC_AUTH_PASSWORD_HASH=$$2a$$14$$...
 bash infra/prod/deploy_prod.sh
 ```
 
+The deploy script currently uses the minimal public MVP stack (`caddy + web-client`) and stops the unused backend containers before bringing the public stack up.
+
 This starts Caddy as an internal upstream on `127.0.0.1:8080`.
 
 ### 4. Configure Nginx as public frontend for one hostname
@@ -174,6 +178,8 @@ What it does:
   - `https://<domain>/services/matchmaking/health`
   - `https://<domain>/services/battle/health`
   - `https://<domain>/services/economy/health`
+
+For the current web-only MVP deployment, these protected service health routes return `disabled` while the backend containers remain stopped.
 
 ### 6. Auto-deploy on push to main
 
