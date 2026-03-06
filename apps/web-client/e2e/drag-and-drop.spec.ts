@@ -135,19 +135,22 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("deploys a unit with drag and drop, keeps it centered, and captures screenshots", async ({
+test("deploys multiple units with drag and drop, keeps them centered, and captures screenshots", async ({
   page
 }, testInfo) => {
+  test.setTimeout(120_000);
   fs.mkdirSync(screenshotDir, { recursive: true });
 
   await dragCardToTile(page, "u-vanguard", 0, 6);
+  await dragCardToTile(page, "u-bastion", 1, 6);
+  await dragCardToTile(page, "u-ranger", 2, 6);
 
   await expect
     .poll(async () => {
       const state = await readDebugState(page);
       return state.units.map((unit) => `${unit.id}:${unit.q},${unit.r}`).sort();
     })
-    .toEqual(["u-vanguard:0,6"]);
+    .toEqual(["u-bastion:1,6", "u-ranger:2,6", "u-vanguard:0,6"]);
 
   const state = await readDebugState(page);
   for (const unit of state.units) {
