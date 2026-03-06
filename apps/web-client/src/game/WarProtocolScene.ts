@@ -8,6 +8,7 @@ const GRID_COLS = 5;
 const TILE_FILL = 0x31445a;
 const TILE_STROKE = 0x1b2a38;
 const HIGHLIGHT_STROKE = 0x9be7b0;
+const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const HEX_HALF_WIDTH = Math.sqrt(3) * HEX_SIZE * 0.5;
 
 type CoordKey = `${number},${number}`;
@@ -16,6 +17,7 @@ type TileNode = {
   q: number;
   r: number;
   graphics: Phaser.GameObjects.Graphics;
+  highlightGraphics: Phaser.GameObjects.Graphics;
   centerX: number;
   centerY: number;
   vertices: Array<{ x: number; y: number }>;
@@ -43,6 +45,11 @@ export type BattleDebugState = {
     originY: number;
   };
   statusText: string;
+  selectedReserveUnitId: string | null;
+  highlightedTiles: Array<{
+    q: number;
+    r: number;
+  }>;
   tiles: Array<{
     q: number;
     r: number;
@@ -90,9 +97,9 @@ function hexPoints(size: number): Phaser.Types.Math.Vector2Like[] {
   return points;
 }
 
-function axialToWorld(q: number, r: number): { x: number; y: number } {
+function tileToWorld(q: number, r: number): { x: number; y: number } {
   return {
-    x: HEX_SIZE * Math.sqrt(3) * (q + r / 2),
+    x: q * HEX_WIDTH + (r % 2 === 0 ? 0 : HEX_HALF_WIDTH),
     y: HEX_SIZE * 1.5 * r
   };
 }
@@ -236,6 +243,10 @@ export class WarProtocolScene extends Phaser.Scene {
         originY: this.boardOriginY
       },
       statusText: this.statusText?.text ?? "",
+      selectedReserveUnitId: this.selectedReserveUnitId,
+      highlightedTiles: tiles
+        .filter((tile) => this.selectedReserveUnitId && !this.occupiedTiles.has(this.tileKey(tile.q, tile.r)))
+        .map((tile) => ({ q: tile.q, r: tile.r })),
       tiles,
       units
     };
@@ -265,11 +276,14 @@ export class WarProtocolScene extends Phaser.Scene {
 
       const graphics = this.add.graphics();
       graphics.setDepth(1);
+      const highlightGraphics = this.add.graphics();
+      highlightGraphics.setDepth(2);
 
       this.tiles.set(key, {
         q: tileDef.q,
         r: tileDef.r,
         graphics,
+        highlightGraphics,
         centerX: 0,
         centerY: 0,
         vertices: []
@@ -282,7 +296,7 @@ export class WarProtocolScene extends Phaser.Scene {
     const viewportCenterY = Math.round(this.scale.height * 0.42);
 
     const relativeCenters = Array.from(this.tiles.values()).map((tile) => {
-      const world = axialToWorld(tile.q, tile.r);
+      const world = tileToWorld(tile.q, tile.r);
       return { x: world.x, y: world.y };
     });
 
@@ -297,7 +311,7 @@ export class WarProtocolScene extends Phaser.Scene {
     this.boardOriginY = Math.round(viewportCenterY - boardCenterY);
 
     for (const [, tile] of this.tiles) {
-      const world = axialToWorld(tile.q, tile.r);
+      const world = tileToWorld(tile.q, tile.r);
       tile.centerX = Math.round(world.x + this.boardOriginX);
       tile.centerY = Math.round(world.y + this.boardOriginY);
       tile.vertices = this.pointCache.map((point) => ({
@@ -395,7 +409,7 @@ export class WarProtocolScene extends Phaser.Scene {
   private redrawTile(tile: TileNode, isHighlighted: boolean): void {
     tile.graphics.clear();
     tile.graphics.fillStyle(TILE_FILL, 0.9);
-    tile.graphics.lineStyle(3, isHighlighted ? HIGHLIGHT_STROKE : TILE_STROKE, isHighlighted ? 1 : 0.95);
+    tile.graphics.lineStyle(3, TILE_STROKE, 0.95);
     tile.graphics.beginPath();
     tile.graphics.moveTo(tile.vertices[0].x, tile.vertices[0].y);
     for (let index = 1; index < tile.vertices.length; index += 1) {
@@ -404,6 +418,20 @@ export class WarProtocolScene extends Phaser.Scene {
     tile.graphics.closePath();
     tile.graphics.fillPath();
     tile.graphics.strokePath();
+
+    tile.highlightGraphics.clear();
+    if (!isHighlighted) {
+      return;
+    }
+
+    tile.highlightGraphics.lineStyle(4, HIGHLIGHT_STROKE, 1);
+    tile.highlightGraphics.beginPath();
+    tile.highlightGraphics.moveTo(tile.vertices[0].x, tile.vertices[0].y);
+    for (let index = 1; index < tile.vertices.length; index += 1) {
+      tile.highlightGraphics.lineTo(tile.vertices[index].x, tile.vertices[index].y);
+    }
+    tile.highlightGraphics.closePath();
+    tile.highlightGraphics.strokePath();
   }
 
   private emitRosterState(): void {

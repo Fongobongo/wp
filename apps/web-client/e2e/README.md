@@ -4,9 +4,11 @@ Headless browser smoke coverage for the web MVP lives here.
 
 Current scope:
 - rendering of a 23-hex battlefield with row lengths `5 / 4 / 5 / 4 / 5`;
+- row-offset alignment of odd rows, so the board follows the intended `5 / 4 / 5 / 4 / 5` shape;
 - rendering of 5 reserve unit cards;
 - canceling an active placement selection;
 - resetting the current deployment state after units are placed;
+- keeping all free neighboring hexes highlighted after one hex becomes occupied;
 - drag-and-drop deployment from the reserve card into an empty battlefield hex;
 - rejection of drops outside the active grid;
 - screenshot capture after successful deployment;

@@ -65,9 +65,11 @@ npm run dev:battle
 The repository includes a Playwright smoke suite for the current deployment sandbox MVP. It verifies:
 
 - rendering of a 23-hex battlefield with row lengths `5 / 4 / 5 / 4 / 5`;
+- row-offset alignment of odd rows, so the board does not drift right on each next row;
 - rendering of 5 reserve unit cards;
 - canceling an active placement selection;
 - resetting the current deployment state after units are placed;
+- keeping all free neighboring hexes highlighted after one hex becomes occupied;
 - drag-and-drop deployment of a reserve unit into a selected grid hex;
 - rejection of drops outside the active grid;
 - pixel-based checks that the rendered unit blob stays centered inside the target hex polygon.

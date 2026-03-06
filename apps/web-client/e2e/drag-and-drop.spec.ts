@@ -6,6 +6,11 @@ import { PNG } from "pngjs";
 
 type BattleDebugState = {
   statusText: string;
+  selectedReserveUnitId: string | null;
+  highlightedTiles: Array<{
+    q: number;
+    r: number;
+  }>;
   tiles: Array<{
     q: number;
     r: number;
@@ -272,6 +277,16 @@ test("renders the expanded deployment grid and roster", async ({ page }) => {
   expect(state.tiles).toHaveLength(EXPECTED_TILE_COUNT);
   await expect(unitCards(page)).toHaveCount(EXPECTED_UNIT_COUNT);
   await expect(page.getByTestId("cancel-placement-button")).toBeDisabled();
+
+  const rowStartX = [0, 1, 2, 3, 4].map((row) =>
+    Math.min(...state.tiles.filter((tile) => tile.r === row).map((tile) => tile.centerX))
+  );
+  const expectedOffset = (Math.sqrt(3) * state.board.hexSize) / 2;
+
+  expect(rowStartX[0]).toBeCloseTo(rowStartX[2], 0);
+  expect(rowStartX[0]).toBeCloseTo(rowStartX[4], 0);
+  expect(rowStartX[1]).toBeCloseTo(rowStartX[3], 0);
+  expect(rowStartX[1] - rowStartX[0]).toBeCloseTo(expectedOffset, 0);
 });
 
 test("cancels an active placement selection", async ({ page }) => {
@@ -325,6 +340,44 @@ test("resets deployed units from the current placement state", async ({ page }) 
 
   await expect(page.getByTestId("unit-card-u-vanguard")).not.toHaveClass(/is-deployed/);
   await expect(page.getByTestId("cancel-placement-button")).toBeDisabled();
+});
+
+test("keeps every free hex highlighted after placing a neighboring unit", async ({ page }) => {
+  const initialState = await readDebugState(page);
+  const occupiedTile = initialState.tiles.find(
+    (candidate) => candidate.q === 2 && candidate.r === 2
+  );
+  expect(occupiedTile).toBeDefined();
+
+  const boardBox = await page.getByTestId("battle-board").boundingBox();
+  expect(boardBox).not.toBeNull();
+
+  await dispatchHtml5Drag(
+    page,
+    UNIT_ID,
+    boardBox!.x + (occupiedTile?.centerX ?? 0),
+    boardBox!.y + (occupiedTile?.centerY ?? 0)
+  );
+
+  await page.waitForFunction(() => {
+    const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
+    return Boolean(state && state.units.some((unit) => unit.id === "u-vanguard"));
+  });
+
+  await page.getByTestId("unit-card-u-bastion").click();
+
+  await page.waitForFunction(() => {
+    const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
+    return Boolean(state && state.selectedReserveUnitId === "u-bastion");
+  });
+
+  const highlightedState = await readDebugState(page);
+  expect(highlightedState.highlightedTiles).toHaveLength(EXPECTED_TILE_COUNT - 1);
+  expect(highlightedState.highlightedTiles).not.toContainEqual({ q: 2, r: 2 });
+  expect(highlightedState.highlightedTiles).toContainEqual({ q: 1, r: 2 });
+  expect(highlightedState.highlightedTiles).toContainEqual({ q: 3, r: 2 });
+  expect(highlightedState.highlightedTiles).toContainEqual({ q: 2, r: 1 });
+  expect(highlightedState.highlightedTiles).toContainEqual({ q: 2, r: 3 });
 });
 
 test("deploys a unit into the selected grid hex", async ({ page }) => {
