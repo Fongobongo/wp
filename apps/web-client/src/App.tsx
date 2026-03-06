@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DEMO_UNITS } from "./game/demoData.js";
 import {
-  deployUnitByCanvasOffset,
+  deployUnitByClientPosition,
   endCurrentTurn,
   mountBattleGame,
   onRosterStateChange,
@@ -103,13 +103,7 @@ export default function App() {
             if (!unitId) {
               return;
             }
-            const nativeEvent = event.nativeEvent;
-            const width = event.currentTarget.clientWidth;
-            const height = event.currentTarget.clientHeight;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const offsetX = event.clientX - rect.left;
-            const offsetY = event.clientY - rect.top;
-            deployUnitByCanvasOffset(unitId, offsetX, offsetY, width, height);
+            deployUnitByClientPosition(unitId, event.clientX, event.clientY);
           }}
         />
       </section>

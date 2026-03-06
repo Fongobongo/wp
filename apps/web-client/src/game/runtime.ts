@@ -117,25 +117,27 @@ export function selectUnitForPlacement(unitId: string): void {
   sceneRef?.selectReserveUnit(unitId);
 }
 
-export function deployUnitByCanvasOffset(
+export function deployUnitByClientPosition(
   unitId: string,
-  offsetX: number,
-  offsetY: number,
-  sourceWidth: number,
-  sourceHeight: number
+  clientX: number,
+  clientY: number
 ): void {
   if (!game || !sceneRef) {
     return;
   }
-  if (sourceWidth <= 0 || sourceHeight <= 0) {
+
+  const canvasRect = game.canvas.getBoundingClientRect();
+  if (canvasRect.width <= 0 || canvasRect.height <= 0) {
     return;
   }
 
   // Keep reserve selection aligned with drag source.
   sceneRef.selectReserveUnit(unitId);
 
-  const worldX = (offsetX / sourceWidth) * game.scale.width;
-  const worldY = (offsetY / sourceHeight) * game.scale.height;
+  const normalizedX = Phaser.Math.Clamp((clientX - canvasRect.left) / canvasRect.width, 0, 1);
+  const normalizedY = Phaser.Math.Clamp((clientY - canvasRect.top) / canvasRect.height, 0, 1);
+  const worldX = normalizedX * game.scale.width;
+  const worldY = normalizedY * game.scale.height;
   sceneRef.deployReserveUnitAtWorld(unitId, worldX, worldY);
 }
 

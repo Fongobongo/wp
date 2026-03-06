@@ -235,9 +235,8 @@ export class WarProtocolScene extends Phaser.Scene {
         tile.setStrokeStyle(2, 0x1b2a38, 0.85);
         tile.setInteractive({ useHandCursor: true });
         tile.on("pointerdown", () => this.onTileClicked(q, r));
-        const bounds = tile.getBounds();
-        const centerX = bounds.centerX;
-        const centerY = bounds.centerY;
+        const centerX = x;
+        const centerY = y;
         const vertices = points.map((point) => ({
           x: centerX + point.x,
           y: centerY + point.y
