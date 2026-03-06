@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { PNG } from "pngjs";
 
 type BattleDebugState = {
@@ -38,7 +38,9 @@ declare global {
 
 const screenshotDir = path.resolve(process.cwd(), "artifacts/ui/screenshots");
 const UNIT_ID = "u-vanguard";
-const TARGET_TILE = { q: 1, r: 1 } as const;
+const TARGET_TILE = { q: 4, r: 4 } as const;
+const EXPECTED_TILE_COUNT = 23;
+const EXPECTED_UNIT_COUNT = 5;
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -138,7 +140,7 @@ function findUnitBlob(
     }
   }
 
-  expect(pixels.length).toBeGreaterThan(1200);
+  expect(pixels.length).toBeGreaterThan(900);
 
   return {
     centroidX: weightedX / pixels.length,
@@ -246,27 +248,89 @@ async function dispatchHtml5Drag(
   );
 }
 
+function unitCards(page: Page): Locator {
+  return page.locator('[data-testid^="unit-card-"]');
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(page.getByTestId("battle-board")).toBeVisible();
   await page.waitForFunction(
-    () => {
+    (expectedTileCount) => {
       const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
-      return Boolean(state && state.tiles.length === 4);
+      return Boolean(state && state.tiles.length === expectedTileCount);
     },
-    undefined,
+    EXPECTED_TILE_COUNT,
     { timeout: 120_000 }
   );
 });
 
-test("deploys the only unit into the selected grid hex", async ({ page }) => {
+test("renders the expanded deployment grid and roster", async ({ page }) => {
+  const state = await readDebugState(page);
+  expect(state.board.cols).toBe(5);
+  expect(state.board.rows).toBe(5);
+  expect(state.tiles).toHaveLength(EXPECTED_TILE_COUNT);
+  await expect(unitCards(page)).toHaveCount(EXPECTED_UNIT_COUNT);
+  await expect(page.getByTestId("cancel-placement-button")).toBeDisabled();
+});
+
+test("cancels an active placement selection", async ({ page }) => {
+  const vanguardCard = page.getByTestId("unit-card-u-vanguard");
+  await vanguardCard.click();
+
+  await expect(vanguardCard).toHaveClass(/is-selected/);
+  await expect(page.getByTestId("cancel-placement-button")).toBeEnabled();
+
+  await page.getByTestId("cancel-placement-button").click();
+
+  await expect(vanguardCard).not.toHaveClass(/is-selected/);
+  await expect(page.getByTestId("cancel-placement-button")).toBeDisabled();
+});
+
+test("resets deployed units from the current placement state", async ({ page }) => {
+  const initialState = await readDebugState(page);
+  const tile = initialState.tiles.find(
+    (candidate) => candidate.q === TARGET_TILE.q && candidate.r === TARGET_TILE.r
+  );
+  expect(tile).toBeDefined();
+
+  const boardBox = await page.getByTestId("battle-board").boundingBox();
+  expect(boardBox).not.toBeNull();
+
+  await dispatchHtml5Drag(
+    page,
+    UNIT_ID,
+    boardBox!.x + (tile?.centerX ?? 0),
+    boardBox!.y + (tile?.centerY ?? 0)
+  );
+
+  await page.waitForFunction(
+    ({ unitId, q, r }) => {
+      const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
+      if (!state) {
+        return false;
+      }
+      return state.units.some((unit) => unit.id === unitId && unit.q === q && unit.r === r);
+    },
+    { unitId: UNIT_ID, q: TARGET_TILE.q, r: TARGET_TILE.r }
+  );
+
+  await expect(page.getByTestId("cancel-placement-button")).toBeEnabled();
+  await page.getByTestId("cancel-placement-button").click();
+
+  await page.waitForFunction(() => {
+    const state = window.__WAR_PROTOCOL_E2E__?.getBattleDebugState();
+    return Boolean(state && state.units.length === 0 && state.statusText === "Deployment reset.");
+  });
+
+  await expect(page.getByTestId("unit-card-u-vanguard")).not.toHaveClass(/is-deployed/);
+  await expect(page.getByTestId("cancel-placement-button")).toBeDisabled();
+});
+
+test("deploys a unit into the selected grid hex", async ({ page }) => {
   fs.mkdirSync(screenshotDir, { recursive: true });
 
   const initialState = await readDebugState(page);
-  expect(initialState.board.cols).toBe(2);
-  expect(initialState.board.rows).toBe(2);
-  expect(initialState.tiles).toHaveLength(4);
-
   const tile = initialState.tiles.find(
     (candidate) => candidate.q === TARGET_TILE.q && candidate.r === TARGET_TILE.r
   );
@@ -290,8 +354,8 @@ test("deploys the only unit into the selected grid hex", async ({ page }) => {
   expect(unit.rootY).toBeCloseTo(tile!.centerY, 1);
   expect(state.statusText).toBe(`Vanguard deployed to hex (${TARGET_TILE.q}, ${TARGET_TILE.r}).`);
 
-  const boardPath = path.join(screenshotDir, "four-hex-board.png");
-  const pagePath = path.join(screenshotDir, "four-hex-page.png");
+  const boardPath = path.join(screenshotDir, "expanded-grid-board.png");
+  const pagePath = path.join(screenshotDir, "expanded-grid-page.png");
   const { buffer: canvasImage, box: canvasBox } = await captureCanvas(page);
   fs.writeFileSync(boardPath, canvasImage);
   await page.screenshot({ path: pagePath, fullPage: true });
@@ -322,7 +386,7 @@ test("deploys the only unit into the selected grid hex", async ({ page }) => {
   expect(insidePixels / blob.pixels.length).toBeGreaterThan(0.98);
 });
 
-test("rejects drops outside the four-hex grid", async ({ page }) => {
+test("rejects drops outside the expanded grid", async ({ page }) => {
   const boardBox = await page.getByTestId("battle-board").boundingBox();
   expect(boardBox).not.toBeNull();
 

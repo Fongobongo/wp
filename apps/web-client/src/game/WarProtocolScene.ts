@@ -1,20 +1,14 @@
 import Phaser from "phaser";
 import { DEMO_UNITS } from "./demoData.js";
 
-const HEX_SIZE = 72;
-const GRID_COLS = 2;
-const GRID_ROWS = 2;
+const HEX_SIZE = 58;
+const ROW_LENGTHS = [5, 4, 5, 4, 5] as const;
+const GRID_ROWS = ROW_LENGTHS.length;
+const GRID_COLS = 5;
 const TILE_FILL = 0x31445a;
 const TILE_STROKE = 0x1b2a38;
 const HIGHLIGHT_STROKE = 0x9be7b0;
 const HEX_HALF_WIDTH = Math.sqrt(3) * HEX_SIZE * 0.5;
-
-const TILE_LAYOUT = [
-  { q: 0, r: 0 },
-  { q: 1, r: 0 },
-  { q: 0, r: 1 },
-  { q: 1, r: 1 }
-] as const;
 
 type CoordKey = `${number},${number}`;
 
@@ -72,6 +66,14 @@ export type BattleDebugState = {
   }>;
 };
 
+const TILE_LAYOUT: Array<{ q: number; r: number }> = [];
+for (let r = 0; r < ROW_LENGTHS.length; r += 1) {
+  const rowLength = ROW_LENGTHS[r];
+  for (let q = 0; q < rowLength; q += 1) {
+    TILE_LAYOUT.push({ q, r });
+  }
+}
+
 function compactUnitName(name: string): string {
   return name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "UNIT";
 }
@@ -124,7 +126,7 @@ export class WarProtocolScene extends Phaser.Scene {
     this.createStatusText();
     this.ensureTiles();
     this.layoutScene();
-    this.statusText.setText("Drag the unit into any hex.");
+    this.statusText.setText("Select a unit, then place it into any empty hex.");
     this.scale.on("resize", this.handleResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off("resize", this.handleResize, this);
@@ -147,6 +149,32 @@ export class WarProtocolScene extends Phaser.Scene {
 
     this.selectedReserveUnitId = unitId;
     this.statusText.setText(`Place ${unit.name} into any empty hex.`);
+    this.emitRosterState();
+    this.refreshHighlights();
+  }
+
+  public cancelReservePlacement(): void {
+    if (this.units.size > 0) {
+      for (const [, unit] of this.units) {
+        unit.root.destroy(true);
+      }
+
+      this.units.clear();
+      this.occupiedTiles.clear();
+      this.selectedReserveUnitId = null;
+      this.statusText.setText("Deployment reset.");
+      this.emitRosterState();
+      this.refreshHighlights();
+      return;
+    }
+
+    if (!this.selectedReserveUnitId) {
+      this.statusText.setText("No unit placement is currently active.");
+      return;
+    }
+
+    this.selectedReserveUnitId = null;
+    this.statusText.setText("Placement canceled.");
     this.emitRosterState();
     this.refreshHighlights();
   }
@@ -255,12 +283,7 @@ export class WarProtocolScene extends Phaser.Scene {
 
     const relativeCenters = Array.from(this.tiles.values()).map((tile) => {
       const world = axialToWorld(tile.q, tile.r);
-      return {
-        q: tile.q,
-        r: tile.r,
-        x: world.x,
-        y: world.y
-      };
+      return { x: world.x, y: world.y };
     });
 
     const minX = Math.min(...relativeCenters.map((tile) => tile.x - HEX_HALF_WIDTH));
@@ -305,13 +328,13 @@ export class WarProtocolScene extends Phaser.Scene {
   private createUnitSprite(state: UnitState): UnitSprite {
     const { x, y } = this.getTileCenter(state.q, state.r);
 
-    const body = this.add.circle(0, 0, 28, state.color, 0.96);
+    const body = this.add.circle(0, 0, 24, state.color, 0.96);
     body.setStrokeStyle(3, 0xe6edf6, 0.95);
 
     const nameLabel = this.add
-      .text(0, -11, compactUnitName(state.name), {
+      .text(0, -10, compactUnitName(state.name), {
         fontFamily: "monospace",
-        fontSize: "10px",
+        fontSize: "9px",
         color: "#f4f8ff"
       })
       .setOrigin(0.5);
@@ -319,15 +342,15 @@ export class WarProtocolScene extends Phaser.Scene {
     const roleLabel = this.add
       .text(0, 1, state.role[0], {
         fontFamily: "monospace",
-        fontSize: "16px",
+        fontSize: "14px",
         color: "#091018"
       })
       .setOrigin(0.5);
 
     const hpLabel = this.add
-      .text(0, 14, `${state.hp}`, {
+      .text(0, 13, `${state.hp}`, {
         fontFamily: "monospace",
-        fontSize: "10px",
+        fontSize: "9px",
         color: "#e7f0fb"
       })
       .setOrigin(0.5);

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DEMO_UNITS } from "./game/demoData.js";
 import {
+  cancelUnitPlacement,
   deployUnitByClientPosition,
   mountBattleGame,
   onRosterStateChange,
@@ -52,21 +53,17 @@ export default function App() {
     };
   }, []);
 
-  const unit = DEMO_UNITS[0];
-  const deployed = rosterState.deployedUnitIds.includes(unit.id);
-  const selectedForDeploy = rosterState.selectedReserveUnitId === unit.id;
-
   return (
     <div className="page">
       <header className="hero">
         <h1>WAR PROTOCOL</h1>
-        <p>Four-hex deployment sandbox. Drag the only unit into any empty hex.</p>
+        <p>Deployment sandbox with 23 hexes and 5 reserve units. Select, drag, place, or reset the current deployment.</p>
       </header>
 
       <section className="panel board-panel">
         <div className="board-header">
           <h2>Battlefield</h2>
-          <span className="board-note">Four hexes. One unit. Drop into any empty hex.</span>
+          <span className="board-note">Rows: 5 / 4 / 5 / 4 / 5. Drop units into empty hexes only.</span>
         </div>
         <div
           className={`battle-canvas${isDragOverBoard ? " is-drag-over" : ""}`}
@@ -92,51 +89,74 @@ export default function App() {
       </section>
 
       <section className="panel roster-panel">
-        <h2>Reserve Unit</h2>
-        <div className="roster-grid">
-          <article
-            className={`unit-card${selectedForDeploy ? " is-selected" : ""}${deployed ? " is-deployed" : ""}`}
-            data-testid={`unit-card-${unit.id}`}
-            draggable={!deployed}
-            onClick={() => {
-              if (!deployed) {
-                selectUnitForPlacement(unit.id);
-              }
-            }}
-            onDragStart={(event) => {
-              if (deployed) {
-                return;
-              }
-              event.dataTransfer.setData("text/unit-id", unit.id);
-              event.dataTransfer.effectAllowed = "move";
-              const preview = createDragPreview(unit.color);
-              event.dataTransfer.setDragImage(preview, 12, 12);
-              window.setTimeout(() => {
-                preview.remove();
-              }, 0);
-              selectUnitForPlacement(unit.id);
-            }}
-            onDragEnd={() => {
-              setIsDragOverBoard(false);
-            }}
+        <div className="roster-header">
+          <h2>Reserve Units</h2>
+          <button
+            type="button"
+            className="secondary-button"
+            data-testid="cancel-placement-button"
+            disabled={!rosterState.selectedReserveUnitId && rosterState.deployedUnitIds.length === 0}
+            onClick={() => cancelUnitPlacement()}
           >
-            <div className="unit-chip-row">
-              <span
-                className="unit-chip"
-                aria-hidden="true"
-                style={{ backgroundColor: colorToCssHex(unit.color) }}
-              />
-              <div className="unit-name">{unit.name}</div>
-            </div>
-            <div className="unit-role">{unit.role}</div>
-            <div className="unit-stats">Team {unit.team}</div>
-            <div className="unit-stats">HP {unit.hp}</div>
-            <div className="unit-stats">ATK {unit.attack}</div>
-            <div className="unit-stats">Move {unit.move}</div>
-            <div className="unit-hint">
-              {deployed ? "Already deployed." : selectedForDeploy ? "Drop into any hex." : "Drag into any hex."}
-            </div>
-          </article>
+            Cancel Placement
+          </button>
+        </div>
+        <div className="roster-grid">
+          {DEMO_UNITS.map((unit) => {
+            const deployed = rosterState.deployedUnitIds.includes(unit.id);
+            const selectedForDeploy = rosterState.selectedReserveUnitId === unit.id;
+
+            return (
+              <article
+                className={`unit-card${selectedForDeploy ? " is-selected" : ""}${deployed ? " is-deployed" : ""}`}
+                data-testid={`unit-card-${unit.id}`}
+                key={unit.id}
+                draggable={!deployed}
+                onClick={() => {
+                  if (!deployed) {
+                    selectUnitForPlacement(unit.id);
+                  }
+                }}
+                onDragStart={(event) => {
+                  if (deployed) {
+                    return;
+                  }
+                  event.dataTransfer.setData("text/unit-id", unit.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  const preview = createDragPreview(unit.color);
+                  event.dataTransfer.setDragImage(preview, 12, 12);
+                  window.setTimeout(() => {
+                    preview.remove();
+                  }, 0);
+                  selectUnitForPlacement(unit.id);
+                }}
+                onDragEnd={() => {
+                  setIsDragOverBoard(false);
+                }}
+              >
+                <div className="unit-chip-row">
+                  <span
+                    className="unit-chip"
+                    aria-hidden="true"
+                    style={{ backgroundColor: colorToCssHex(unit.color) }}
+                  />
+                  <div className="unit-name">{unit.name}</div>
+                </div>
+                <div className="unit-role">{unit.role}</div>
+                <div className="unit-stats">Team {unit.team}</div>
+                <div className="unit-stats">HP {unit.hp}</div>
+                <div className="unit-stats">ATK {unit.attack}</div>
+                <div className="unit-stats">Move {unit.move}</div>
+                <div className="unit-hint">
+                  {deployed
+                    ? "Already deployed."
+                    : selectedForDeploy
+                      ? "Selected for placement."
+                      : "Click or drag to place."}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </section>
     </div>

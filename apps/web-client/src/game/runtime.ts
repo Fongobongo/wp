@@ -6,7 +6,7 @@ let game: Phaser.Game | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let sceneRef: WarProtocolScene | null = null;
 
-const BASE_HEIGHT = 460;
+const BASE_HEIGHT = 720;
 
 type RosterState = {
   deployedUnitIds: string[];
@@ -124,6 +124,10 @@ export function unmountBattleGame(): void {
 
 export function selectUnitForPlacement(unitId: string): void {
   sceneRef?.selectReserveUnit(unitId);
+}
+
+export function cancelUnitPlacement(): void {
+  sceneRef?.cancelReservePlacement();
 }
 
 export function deployUnitByClientPosition(

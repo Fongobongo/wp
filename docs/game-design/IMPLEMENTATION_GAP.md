@@ -10,6 +10,7 @@ This document tracks what is already implemented and what must still be delivere
 4. Deterministic battle engine with event log and replay.
 5. Baseline API and websocket flow for live PvP.
 6. Infrastructure baseline: Docker, Terraform, CI.
+7. Browser deployment sandbox with a 23-hex placement board, 5 reserve units, and cancel-placement interaction for MVP iteration.
 
 ## 3. Not Yet Complete vs GDD
 1. Full War Chest-like bag-draw loop is not implemented (bag/tokens/control markers as independent gameplay layer).

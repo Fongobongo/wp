@@ -3,8 +3,12 @@
 Headless browser smoke coverage for the web MVP lives here.
 
 Current scope:
-- drag-and-drop deployment from the reserve card into one of the four battlefield hexes;
-- rejection of drops outside the four-hex grid;
+- rendering of a 23-hex battlefield with row lengths `5 / 4 / 5 / 4 / 5`;
+- rendering of 5 reserve unit cards;
+- canceling an active placement selection;
+- resetting the current deployment state after units are placed;
+- drag-and-drop deployment from the reserve card into an empty battlefield hex;
+- rejection of drops outside the active grid;
 - screenshot capture after successful deployment;
 - pixel-based checks that the rendered unit blob stays centered inside the target hex polygon.
 
