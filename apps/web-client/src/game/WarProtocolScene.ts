@@ -48,10 +48,15 @@ export type BattleDebugState = {
     r: number;
     centerX: number;
     centerY: number;
+    vertices: Array<{
+      x: number;
+      y: number;
+    }>;
   }>;
   units: Array<{
     id: string;
     name: string;
+    color: number;
     q: number;
     r: number;
     rootX: number;
@@ -206,6 +211,7 @@ export class WarProtocolScene extends Phaser.Scene {
         return {
           id: unit.state.id,
           name: unit.state.name,
+          color: unit.state.color,
           q: unit.state.q,
           r: unit.state.r,
           rootX: unit.root.x,
@@ -221,7 +227,8 @@ export class WarProtocolScene extends Phaser.Scene {
         q: tile.q,
         r: tile.r,
         centerX: tile.centerX,
-        centerY: tile.centerY
+        centerY: tile.centerY,
+        vertices: tile.vertices
       }))
       .sort((left, right) => left.r - right.r || left.q - right.q);
 

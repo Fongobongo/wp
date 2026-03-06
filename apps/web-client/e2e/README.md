@@ -6,7 +6,7 @@ Current scope:
 - drag-and-drop deployment from roster to battlefield;
 - rejection of drops outside the active hex grid;
 - screenshot capture after successful battlefield deployment;
-- visual regression against the committed multi-unit board baseline.
+- pixel-based checks that rendered unit blobs stay inside their edge hex polygons.
 
 Artifacts are written to:
 - `artifacts/ui/screenshots`
