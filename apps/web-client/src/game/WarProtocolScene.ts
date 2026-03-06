@@ -465,26 +465,10 @@ export class WarProtocolScene extends Phaser.Scene {
     body.setStrokeStyle(3, 0xe6edf6, 0.95);
 
     const nameLabel = this.add
-      .text(0, -10, compactUnitName(state.name), {
+      .text(0, 0, compactUnitName(state.name), {
         fontFamily: "monospace",
         fontSize: "9px",
         color: "#f4f8ff"
-      })
-      .setOrigin(0.5);
-
-    const centerLabel = this.add
-      .text(0, 0, state.team[0], {
-        fontFamily: "monospace",
-        fontSize: "14px",
-        color: "#091018"
-      })
-      .setOrigin(0.5);
-
-    const moveLabel = this.add
-      .text(0, 11, `MV ${state.move}`, {
-        fontFamily: "monospace",
-        fontSize: "8px",
-        color: "#e7f0fb"
       })
       .setOrigin(0.5);
 
@@ -494,15 +478,7 @@ export class WarProtocolScene extends Phaser.Scene {
     const attackChip = this.createInfoChip(-23, 15, 34, 16, `AT ${state.attack}`);
     const healthChip = this.createInfoChip(23, 15, 34, 16, `HP ${state.hp}`);
 
-    const root = this.add.container(x, y, [
-      body,
-      nameLabel,
-      centerLabel,
-      moveLabel,
-      roleChip,
-      attackChip,
-      healthChip
-    ]);
+    const root = this.add.container(x, y, [body, nameLabel, roleChip, attackChip, healthChip]);
     root.setDepth(10);
 
     return { state, root, body };

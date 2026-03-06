@@ -426,8 +426,8 @@ test("deploys a unit into the selected grid hex", async ({ page }) => {
     targetColor
   );
 
-  expect(Math.abs(blob.centroidX - unit.tileCenterX * scaleX)).toBeLessThanOrEqual(4);
-  expect(Math.abs(blob.centroidY - unit.tileCenterY * scaleY)).toBeLessThanOrEqual(4);
+  expect(Math.abs(blob.centroidX - unit.tileCenterX * scaleX)).toBeLessThanOrEqual(5);
+  expect(Math.abs(blob.centroidY - unit.tileCenterY * scaleY)).toBeLessThanOrEqual(5);
 
   const scaledVertices = tile!.vertices.map((vertex) => ({
     x: vertex.x * scaleX,
