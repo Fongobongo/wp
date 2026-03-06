@@ -17,6 +17,7 @@ type TileNode = {
   polygon: Phaser.GameObjects.Polygon;
   centerX: number;
   centerY: number;
+  vertices: Array<{ x: number; y: number }>;
 };
 
 type UnitTemplate = (typeof DEMO_UNITS)[number];
@@ -175,27 +176,50 @@ export class WarProtocolScene extends Phaser.Scene {
     worldX: number,
     worldY: number
   ): { q: number; r: number } | null {
+    let bestTile: { q: number; r: number } | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
     for (const [, tile] of this.tiles) {
-      const localX = worldX - tile.centerX;
-      const localY = worldY - tile.centerY;
-      if (this.isInsideHex(localX, localY)) {
-        return { q: tile.q, r: tile.r };
+      if (!this.isPointInsidePolygon(worldX, worldY, tile.vertices)) {
+        continue;
+      }
+
+      const dx = worldX - tile.centerX;
+      const dy = worldY - tile.centerY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestTile = { q: tile.q, r: tile.r };
       }
     }
 
-    return null;
+    return bestTile;
   }
 
-  private isInsideHex(localX: number, localY: number): boolean {
-    const x = Math.abs(localX);
-    const y = Math.abs(localY);
-    const halfWidth = (Math.sqrt(3) / 2) * HEX_SIZE;
+  private isPointInsidePolygon(
+    x: number,
+    y: number,
+    vertices: Array<{ x: number; y: number }>
+  ): boolean {
+    let inside = false;
+    let j = vertices.length - 1;
 
-    if (x > halfWidth || y > HEX_SIZE) {
-      return false;
+    for (let i = 0; i < vertices.length; i += 1) {
+      const xi = vertices[i].x;
+      const yi = vertices[i].y;
+      const xj = vertices[j].x;
+      const yj = vertices[j].y;
+
+      const intersects =
+        yi > y !== yj > y &&
+        x < ((xj - xi) * (y - yi)) / ((yj - yi) + Number.EPSILON) + xi;
+      if (intersects) {
+        inside = !inside;
+      }
+      j = i;
     }
 
-    return Math.sqrt(3) * y + x <= Math.sqrt(3) * HEX_SIZE + 0.01;
+    return inside;
   }
 
   private drawHexBoard(): void {
@@ -214,6 +238,10 @@ export class WarProtocolScene extends Phaser.Scene {
         const bounds = tile.getBounds();
         const centerX = bounds.centerX;
         const centerY = bounds.centerY;
+        const vertices = points.map((point) => ({
+          x: centerX + point.x,
+          y: centerY + point.y
+        }));
 
         this.tiles.set(this.tileKey(q, r), {
           q,
@@ -221,7 +249,8 @@ export class WarProtocolScene extends Phaser.Scene {
           type: tileType,
           polygon: tile,
           centerX,
-          centerY
+          centerY,
+          vertices
         });
 
         if ((q + r) % 4 === 0) {
